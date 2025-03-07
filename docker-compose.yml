@@ -9,15 +9,19 @@ services:
       - MYSQL_ROOT_HOST=%
     volumes:
       - db_data:/var/lib/mysql
-      - ./backend/mysql-init:/docker-entrypoint-initdb.d
+      - /var/www/html/cs308/backend/mysql-init:/docker-entrypoint-initdb.d
     ports:
       - "3306:3306"
 
   backend:
-    build: ./backend
+    build: /var/www/html/cs308/backend
     container_name: backend_container
     ports:
       - "5000:5000"
+    volumes:
+      - /var/www/html/cs308/backend:/usr/src/app  # Mount backend source code
+      - /var/www/html/cs308/backend/product_images:/usr/src/app/product_images  # Ensure image directory is accessible
+    working_dir: /usr/src/app  # Set correct working directory
     depends_on:
       - mysql
     environment:
@@ -25,14 +29,22 @@ services:
       DB_USER: root
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ecommerce
+    command: npx nodemon server.js  # Use nodemon for hot reloading
 
   frontend:
-    build: ./frontend
+    build: /var/www/html/cs308/frontend
     container_name: frontend_container
     ports:
-      - "3000:80"
+      - "3000:3000"  # Use port 3000 for development with hot reload
+    volumes:
+      - /var/www/html/cs308/frontend:/usr/src/app  # Mount frontend source code
+      - /usr/src/app/node_modules  # Prevent overwriting node_modules
+    working_dir: /usr/src/app  # Set correct working directory
     depends_on:
       - backend
+    environment:
+      - CHOKIDAR_USEPOLLING=true  # Enable file watching for hot reloading
+    command: npm start  # Run frontend development server
 
 volumes:
   db_data:
