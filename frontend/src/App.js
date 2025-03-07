@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
+import Login from './components/Login';
+import Register from './components/Register';
 
+// ProductCard Component
 function ProductCard({ product }) {
   const [quantity, setQuantity] = useState(1);
 
@@ -17,7 +21,6 @@ function ProductCard({ product }) {
   return (
     <div className="product-card">
       <div className="product-image-container">
-        {/* Image is scaled down and constrained by CSS */}
         <img
           src={`/${product.image_path}`}
           alt={product.name}
@@ -38,7 +41,9 @@ function ProductCard({ product }) {
             –
           </button>
           <span className="quantity-value">{quantity}</span>
-          <button onClick={handleIncrement} className="quantity-btn">+</button>
+          <button onClick={handleIncrement} className="quantity-btn">
+            +
+          </button>
         </div>
         <button className="add-to-cart-btn">Add to Cart</button>
       </div>
@@ -46,12 +51,14 @@ function ProductCard({ product }) {
   );
 }
 
-function App() {
+// Products Component that fetches and displays products
+function Products() {
   const [products, setProducts] = useState([]);
   const [imageUrls, setImageUrls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Fetch products and images on mount
   useEffect(() => {
     Promise.all([
       fetch('/api/products'),
@@ -99,6 +106,45 @@ function App() {
         </div>
       </header>
     </div>
+  );
+}
+
+// Main App Component that handles routing and authentication
+function App() {
+  // Global authentication state
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  return (
+    <Router>
+      <Routes>
+        {/* Login route: If authenticated, redirect to products */}
+        <Route
+          path="/login"
+          element={
+            isAuthenticated ? (
+              <Navigate to="/products" replace />
+            ) : (
+              <Login onLogin={() => setIsAuthenticated(true)} />
+            )
+          }
+        />
+        {/* Register route */}
+        <Route path="/register" element={<Register />} />
+        {/* Protected Products route: If not authenticated, redirect to login */}
+        <Route
+          path="/products"
+          element={
+            isAuthenticated ? (
+              <Products />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        {/* Default route redirects to login */}
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </Router>
   );
 }
 
