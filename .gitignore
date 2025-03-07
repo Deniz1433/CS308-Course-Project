@@ -1,0 +1,38 @@
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.*
+
+# Build artifacts
+build/
+dist/
+coverage/
+
+# Editor/IDE settings
+.vscode/
+.idea/
+
+# Docker
+docker-compose.override.yml
+*.local
+
+# Optional if using Yarn
+.pnp/
+.pnp.js
+
+# Optional if using npm workspaces
+*.tgz

@@ -1,0 +1,118 @@
+.App {
+  text-align: center;
+  padding: 20px;
+  background-color: #f7f7f7;
+  min-height: 100vh;
+}
+
+.App-header {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+h1 {
+  margin-bottom: 20px;
+}
+
+/* Container for product cards */
+.product-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 20px;
+}
+
+/* Each product card is a horizontal rectangle with golden ratio dimensions */
+.product-card {
+  display: flex;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  overflow: hidden;
+  width: 480px; /* example width */
+  /* height set according to golden ratio (height = width / 1.618) */
+  height: calc(480px / 1.618);
+}
+
+/* Container for image (approximately 40% of width) */
+.product-image-container {
+  flex: 0 0 40%;
+  overflow: hidden;
+}
+
+.product-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Container for product info (approximately 60% of width) */
+.product-info {
+  flex: 1;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  text-align: left;
+}
+
+.product-name {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #333;
+}
+
+.product-description {
+  font-size: 0.9rem;
+  color: #666;
+  margin: 5px 0;
+}
+
+.product-category,
+.product-price {
+  font-size: 0.9rem;
+  color: #333;
+}
+
+/* Quantity selector styles */
+.quantity-selector {
+  display: flex;
+  align-items: center;
+  margin: 10px 0;
+}
+
+.quantity-btn {
+  width: 30px;
+  height: 30px;
+  font-size: 1.2rem;
+  border: 1px solid #ccc;
+  background: #fff;
+  cursor: pointer;
+}
+
+.quantity-btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.quantity-value {
+  width: 40px;
+  text-align: center;
+  font-size: 1rem;
+}
+
+/* Add to cart button */
+.add-to-cart-btn {
+  padding: 8px 12px;
+  font-size: 1rem;
+  background: #f5c518; /* a golden yellow color */
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #333;
+  transition: background 0.3s;
+}
+
+.add-to-cart-btn:hover {
+  background: #e0b307;
+}
