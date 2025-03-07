@@ -5,11 +5,13 @@ import Login from './components/Login';
 import Register from './components/Register';
 
 // ProductCard Component
-function ProductCard({ product }) {
+ProductCard({ product }) {
   const [quantity, setQuantity] = useState(1);
 
   const handleIncrement = () => {
-    setQuantity(q => q + 1);
+    if (quantity < product.stock) {
+      setQuantity(q => q + 1);
+    }
   };
 
   const handleDecrement = () => {
@@ -18,11 +20,32 @@ function ProductCard({ product }) {
     }
   };
 
+  const handleManualChange = (e) => {
+    const value = e.target.value;
+    // Allow empty input (for deletion)
+    if (value === "") {
+      setQuantity("");
+      return;
+    }
+    // Ensure the value is a number and within the valid range
+    if (!isNaN(value) && value >= 1 && value <= product.stock) {
+      setQuantity(Number(value));
+    }
+  };
+
+  const handleBlur = (e) => {
+    const value = e.target.value;
+    // Reset to 1 if the input is empty
+    if (value === "") {
+      setQuantity(1);
+    }
+  };
+
   return (
     <div className="product-card">
       <div className="product-image-container">
         <img
-          src={`/${product.image_path}`}
+          src={product.image_path}
           alt={product.name}
           className="product-image"
         />
@@ -32,6 +55,7 @@ function ProductCard({ product }) {
         <p className="product-description">{product.description}</p>
         <p className="product-category">Category: {product.category}</p>
         <p className="product-price">Price: ${product.price}</p>
+        <p className="product-stock">Stock: {product.stock}</p>
         <div className="quantity-selector">
           <button
             onClick={handleDecrement}
@@ -42,6 +66,18 @@ function ProductCard({ product }) {
           </button>
           <span className="quantity-value">{quantity}</span>
           <button onClick={handleIncrement} className="quantity-btn">
+          <input
+            type="text"
+            value={quantity}
+            onChange={handleManualChange}
+            onBlur={handleBlur}
+            className="quantity-input"
+          />
+          <button
+            onClick={handleIncrement}
+            className={`quantity-btn ${quantity === product.stock ? 'disabled' : ''}`}
+            disabled={quantity === product.stock}
+          >
             +
           </button>
         </div>
@@ -54,30 +90,20 @@ function ProductCard({ product }) {
 // Products Component that fetches and displays products
 function Products() {
   const [products, setProducts] = useState([]);
-  const [imageUrls, setImageUrls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   // Fetch products and images on mount
   useEffect(() => {
-    Promise.all([
-      fetch('/api/products'),
-      fetch('/api/images')
-    ])
-      .then(async ([productsRes, imagesRes]) => {
-        if (!productsRes.ok) {
-          throw new Error(`Products API error: ${productsRes.status}`);
+    fetch('/api/products')
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Products API error: ${response.status}`);
         }
-        if (!imagesRes.ok) {
-          throw new Error(`Images API error: ${imagesRes.status}`);
-        }
-        const productsData = await productsRes.json();
-        const imagesData = await imagesRes.json();
-        return [productsData, imagesData];
+        return response.json();
       })
-      .then(([productsData, imagesData]) => {
-        setProducts(productsData);
-        setImageUrls(imagesData);
+      .then(data => {
+        setProducts(data);
         setLoading(false);
       })
       .catch(err => {
@@ -149,3 +175,5 @@ function App() {
 }
 
 export default App;
+
+
