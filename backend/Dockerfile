@@ -10,6 +10,12 @@ COPY package*.json ./
 # Install dependencies
 RUN npm install
 
+# Install nodemon globally
+RUN npm install -g nodemon
+
+# Rebuild bcrypt for ARM64
+RUN npm rebuild bcrypt --build-from-source
+
 # Copy the rest of your backend code
 COPY . .
 
