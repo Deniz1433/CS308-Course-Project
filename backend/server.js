@@ -1,6 +1,6 @@
 const express = require("express");
 const mysql = require("mysql2");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 const cors = require("cors");
 
 require("dotenv").config();
@@ -53,7 +53,7 @@ app.post("/api/register", async (req, res) => {
     }
 
     // Hash the password
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword =  bcrypt.hashSync(password, 10);
 
     // Insert new user
     await pool
@@ -88,7 +88,7 @@ app.post("/api/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
-    const isValidPassword = await bcrypt.compare(password, user[0].password);
+    const isValidPassword =  bcrypt.compareSync(password, user[0].password);
     if (!isValidPassword) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
