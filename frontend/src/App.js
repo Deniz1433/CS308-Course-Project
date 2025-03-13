@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import './App.css';
+import Login from './pages/Login';
+import Register from './pages/Register';
 
 function ProductCard({ product }) {
   const [quantity, setQuantity] = useState(1);
@@ -18,21 +21,17 @@ function ProductCard({ product }) {
 
   const handleManualChange = (e) => {
     const value = e.target.value;
-    // Allow empty input (for deletion)
     if (value === "") {
       setQuantity("");
       return;
     }
-    // Ensure the value is a number and within the valid range
     if (!isNaN(value) && value >= 1 && value <= product.stock) {
       setQuantity(Number(value));
     }
   };
 
   const handleBlur = (e) => {
-    const value = e.target.value;
-    // Reset to 1 if the input is empty
-    if (value === "") {
+    if (e.target.value === "") {
       setQuantity(1);
     }
   };
@@ -81,7 +80,7 @@ function ProductCard({ product }) {
   );
 }
 
-function App() {
+function ProductListing() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -115,15 +114,35 @@ function App() {
 
   return (
     <div className="App">
+      {/* Header Container for Proper Alignment */}
       <header className="App-header">
-        <h1>Product Listings</h1>
-        <div className="product-list">
-          {products.map(product => (
-            <ProductCard key={product.id} product={product} />
-          ))}
+        <div className="header-container">
+          <h1>Product Listings</h1>
+          <Link to="/login">
+            <button className="login-btn">Login</button>
+          </Link>
         </div>
       </header>
+
+      {/* Product List */}
+      <div className="product-list">
+        {products.map(product => (
+          <ProductCard key={product.id} product={product} />
+        ))}
+      </div>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<ProductListing />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+      </Routes>
+    </Router>
   );
 }
 
