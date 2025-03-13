@@ -82,6 +82,6 @@ CREATE TABLE IF NOT EXISTS wishlists (
 
 INSERT INTO products (name, description, category, price, stock, image_path)
 VALUES 
-  ('Laptop Pro', 'A powerful laptop for professionals', 'Electronics', 1299.99, 50, 'product_images/laptop_pro.jpg'),
+  ('Laptop Pro', 'A powerful laptop for professionals', 'laptop', 1299.99, 50, 'product_images/laptop_pro.jpg'),
   ('Wireless Headphones', 'Noise-cancelling over-ear headphones', 'Electronics', 199.99, 100, 'product_images/headphones.jpg'),
   ('Smartwatch X', 'Feature-packed smartwatch with health tracking', 'Wearables', 299.99, 75, 'product_images/smartwatch_x.jpg');
