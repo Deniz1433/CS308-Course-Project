@@ -1,10 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../AuthContext"; // Import Auth Context
+import { SessionContext } from "../middleware/SessionManager";
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login } = useContext(SessionContext);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -25,8 +25,9 @@ const Login = () => {
         throw new Error(data.error || "Login failed");
       }
 
-      login({ id: data.user.id, name: data.user.name, email: data.user.email }); // Store user
-      navigate("/"); // Redirect to home
+      // Update the session with user data.
+      login({ id: data.user.id, name: data.user.name, email: data.user.email });
+      navigate("/"); // Redirect to home after login
     } catch (err) {
       setError(err.message);
     }

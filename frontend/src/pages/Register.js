@@ -20,6 +20,13 @@ const Register = () => {
       return;
     }
 
+    // Client-side password validation: at least 8 characters with at least one letter and one number
+    const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/;
+    if (!passwordRegex.test(password)) {
+      setError("Password must be at least 8 characters long and include at least one letter and one number.");
+      return;
+    }
+
     try {
       const response = await fetch("/api/register", {
         method: "POST",
@@ -47,7 +54,7 @@ const Register = () => {
       <form onSubmit={handleRegister}>
         <input
           type="text"
-          placeholder="Full Name" // New input field for name
+          placeholder="Full Name"
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
@@ -61,7 +68,7 @@ const Register = () => {
         />
         <input
           type="password"
-          placeholder="Password (6+ characters)"
+          placeholder="Password (min 8 characters, include letters & numbers)"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required

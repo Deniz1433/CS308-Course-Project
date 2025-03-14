@@ -2,6 +2,7 @@ const express = require("express");
 const mysql = require("mysql2");
 const bcrypt = require("bcryptjs");
 const cors = require("cors");
+const backendSession = require('./sessionmanager'); // Notice the path adjusted to backend/sessionmanager.js
 
 require("dotenv").config();
 const app = express();
@@ -10,6 +11,7 @@ const port = 5000;
 app.use('/product_images', express.static('product_images'));
 app.use(cors());
 app.use(express.json()); // Enable JSON parsing
+app.use(backendSession); // Use the session middleware
 
 // Database connection
 const pool = mysql.createPool({
@@ -35,12 +37,10 @@ app.get('/api/products', (req, res) => {
 
 // 🟢 Register Endpoint with Password Hashing
 app.post("/api/register", async (req, res) => {
-
   const { name, email, password, home_address = null } = req.body;
   if (!name || !email || !password) {
     return res.status(400).json({ error: "Name, Email, and Password are required" });
   }
-
 
   try {
     // Check if the user already exists
@@ -53,7 +53,7 @@ app.post("/api/register", async (req, res) => {
     }
 
     // Hash the password
-    const hashedPassword =  bcrypt.hashSync(password, 10);
+    const hashedPassword = bcrypt.hashSync(password, 10);
 
     // Insert new user
     await pool
@@ -73,7 +73,6 @@ app.post("/api/register", async (req, res) => {
 // 🟢 Login Endpoint with Password Verification
 app.post("/api/login", async (req, res) => {
   const { email, password } = req.body;
-
   if (!email || !password) {
     return res.status(400).json({ error: "All fields are required" });
   }
@@ -88,12 +87,15 @@ app.post("/api/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
-    const isValidPassword =  bcrypt.compareSync(password, user[0].password);
+    const isValidPassword = bcrypt.compareSync(password, user[0].password);
     if (!isValidPassword) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
-    res.status(200).json({ message: "Login successful", user: { id: user[0].id, name: user[0].name, email: user[0].email } });
+    // Store user info in the session
+    req.session.user = { id: user[0].id, name: user[0].name, email: user[0].email };
+
+    res.status(200).json({ message: "Login successful", user: req.session.user });
   } catch (error) {
     console.error("Login error:", error);
     res.status(500).json({ error: "Server error" });

@@ -1,8 +1,31 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import './App.css';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import { SessionProvider, SessionContext } from './middleware/SessionManager';
+
+function Header() {
+  const { user, logout } = useContext(SessionContext);
+
+  return (
+    <header className="App-header">
+      <div className="header-container">
+        <h1>Product Listings</h1>
+        {user ? (
+          <div>
+            <span>Welcome, {user.name}!</span>
+            <button onClick={logout} className="logout-btn">Logout</button>
+          </div>
+        ) : (
+          <Link to="/login">
+            <button className="login-btn">Login</button>
+          </Link>
+        )}
+      </div>
+    </header>
+  );
+}
 
 function ProductCard({ product }) {
   const [quantity, setQuantity] = useState(1);
@@ -114,17 +137,7 @@ function ProductListing() {
 
   return (
     <div className="App">
-      {/* Header Container for Proper Alignment */}
-      <header className="App-header">
-        <div className="header-container">
-          <h1>Product Listings</h1>
-          <Link to="/login">
-            <button className="login-btn">Login</button>
-          </Link>
-        </div>
-      </header>
-
-      {/* Product List */}
+      <Header />
       <div className="product-list">
         {products.map(product => (
           <ProductCard key={product.id} product={product} />
@@ -136,13 +149,15 @@ function ProductListing() {
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<ProductListing />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-      </Routes>
-    </Router>
+    <SessionProvider>
+      <Router>
+        <Routes>
+          <Route path="/" element={<ProductListing />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+        </Routes>
+      </Router>
+    </SessionProvider>
   );
 }
 
