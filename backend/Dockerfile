@@ -14,7 +14,7 @@ RUN npm install
 RUN npm install -g nodemon
 
 # Rebuild bcrypt for ARM64
-RUN npm rebuild bcrypt --build-from-source
+RUN npm rebuild bcryptjs --build-from-source
 
 # Copy the rest of your backend code
 COPY . .
