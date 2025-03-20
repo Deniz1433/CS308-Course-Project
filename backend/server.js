@@ -62,6 +62,33 @@ app.get('/api/images', (req, res) => {
   });
 });
 
+
+// 🟢 Search Products by Name or Description
+app.get("/api/search-products", (req, res) => {
+  const { query } = req.query;
+
+  if (!query) {
+    return res.status(400).json({ error: "Search query is required" });
+  }
+
+  const searchQuery = `
+    SELECT * FROM products 
+    WHERE LOWER(name) LIKE LOWER(?) 
+       OR LOWER(description) LIKE LOWER(?)
+  `;
+
+  const searchTerm = `%${query}%`; // Wildcard search
+
+  pool.query(searchQuery, [searchTerm, searchTerm], (error, results) => {
+    if (error) {
+      console.error("Error searching products:", error);
+      return res.status(500).json({ error: "Database error" });
+    }
+    res.json(results);
+  });
+});
+
+
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });

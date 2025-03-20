@@ -1,5 +1,46 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
+<<<<<<< Updated upstream
+=======
+import Login from './pages/Login';
+import Register from './pages/Register';
+import { SessionProvider, SessionContext } from './middleware/SessionManager';
+
+function Header({ onSearch }) {
+  const { user, logout } = useContext(SessionContext);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+    onSearch(e.target.value); // Trigger search
+  };
+
+  return (
+    <header className="App-header">
+      <div className="header-container">
+        <h1>Product Listings</h1>
+        <input
+          type="text"
+          placeholder="Search products..."
+          value={searchTerm}
+          onChange={handleSearchChange}
+          className="search-input"
+        />
+        {user ? (
+          <div>
+            <span>Welcome, {user.name}!</span>
+            <button onClick={logout} className="logout-btn">Logout</button>
+          </div>
+        ) : (
+          <Link to="/login">
+            <button className="login-btn">Login</button>
+          </Link>
+        )}
+      </div>
+    </header>
+  );
+}
+>>>>>>> Stashed changes
 
 function ProductCard({ product }) {
   const [quantity, setQuantity] = useState(1);
@@ -86,11 +127,16 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    fetch('/api/products')
+  const fetchProducts = (query = "") => {
+    setLoading(true);
+    const url = query
+      ? `/api/search-products?query=${encodeURIComponent(query)}`
+      : "/api/products";
+
+    fetch(url)
       .then(response => {
         if (!response.ok) {
-          throw new Error(`Products API error: ${response.status}`);
+          throw new Error(`API error: ${response.status}`);
         }
         return response.json();
       })
@@ -99,22 +145,19 @@ function App() {
         setLoading(false);
       })
       .catch(err => {
-        console.error('Error fetching data:', err);
+        console.error("Error fetching products:", err);
         setError(err.message);
         setLoading(false);
       });
+  };
+
+  useEffect(() => {
+    fetchProducts(); // Fetch all products initially
   }, []);
-
-  if (loading) {
-    return <div className="App"><p>Loading...</p></div>;
-  }
-
-  if (error) {
-    return <div className="App"><p>Error: {error}</p></div>;
-  }
 
   return (
     <div className="App">
+<<<<<<< Updated upstream
       <header className="App-header">
         <h1>Product Listings</h1>
         <div className="product-list">
@@ -123,8 +166,39 @@ function App() {
           ))}
         </div>
       </header>
+=======
+      <Header onSearch={fetchProducts} />
+      {loading ? <p>Loading...</p> : error ? <p>Error: {error}</p> : (
+        <div className="product-list">
+          {products.length > 0 ? (
+            products.map(product => <ProductCard key={product.id} product={product} />)
+          ) : (
+            <p>No products found</p>
+          )}
+        </div>
+      )}
+>>>>>>> Stashed changes
     </div>
   );
 }
 
+<<<<<<< Updated upstream
 export default App;
+=======
+
+function App() {
+  return (
+    <SessionProvider>
+      <Router>
+        <Routes>
+          <Route path="/" element={<ProductListing />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+        </Routes>
+      </Router>
+    </SessionProvider>
+  );
+}
+
+export default App;
+>>>>>>> Stashed changes
