@@ -107,6 +107,7 @@ function ProductListing() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState(null);
 
   useEffect(() => {
     fetch('/api/products')
@@ -135,17 +136,61 @@ function ProductListing() {
     return <div className="App"><p>Error: {error}</p></div>;
   }
 
+  // Group products by category
+  const categorizedProducts = products.reduce((acc, product) => {
+    if (!acc[product.category]) {
+      acc[product.category] = [];
+    }
+    acc[product.category].push(product);
+    return acc;
+  }, {});
+
+  // Get all unique categories
+  const categories = Object.keys(categorizedProducts);
+
   return (
     <div className="App">
       <Header />
-      <div className="product-list">
-        {products.map(product => (
-          <ProductCard key={product.id} product={product} />
+      <div className="category-selector">
+        <button onClick={() => setSelectedCategory(null)} className={!selectedCategory ? "active" : ""}>All Products</button>
+        {categories.map(category => (
+          <button
+            key={category}
+            onClick={() => setSelectedCategory(category)}
+            className={selectedCategory === category ? "active" : ""}
+          >
+            {category}
+          </button>
         ))}
+      </div>
+      
+      <div className="product-list">
+        {selectedCategory ? (
+          <div key={selectedCategory}>
+            <h2 className="category-title">{selectedCategory}</h2>
+            <div className="category-products">
+              {categorizedProducts[selectedCategory].map(product => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          </div>
+        ) : (
+          categories.map(category => (
+            <div key={category}>
+              <h2 className="category-title">{category}</h2>
+              <div className="category-products">
+                {categorizedProducts[category].map(product => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
 }
+
 
 function App() {
   return (
