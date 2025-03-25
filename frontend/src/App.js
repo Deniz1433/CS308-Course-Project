@@ -1,10 +1,67 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, createContext } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import './App.css';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import { SessionProvider, SessionContext } from './middleware/SessionManager';
 
+// ----- CART CONTEXT AND PROVIDER -----
+export const CartContext = createContext();
+
+export const CartProvider = ({ children }) => {
+  const [cart, setCart] = useState(() => {
+    const storedCart = localStorage.getItem('cart');
+    return storedCart ? JSON.parse(storedCart) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('cart', JSON.stringify(cart));
+  }, [cart]);
+
+  const addToCart = (product, quantity) => {
+    setCart(prevCart => {
+      const existingItem = prevCart.find(item => item.id === product.id);
+      if (existingItem) {
+        return prevCart.map(item =>
+          item.id === product.id
+            ? { ...item, quantity: item.quantity + quantity }
+            : item
+        );
+      }
+      return [
+        ...prevCart,
+        {
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          image_path: product.image_path,
+          quantity,
+          stock: product.stock,
+        },
+      ];
+    });
+  };
+
+  const removeFromCart = (productId) => {
+    setCart(prevCart => prevCart.filter(item => item.id !== productId));
+  };
+
+  const updateCartQuantity = (productId, newQuantity) => {
+    setCart(prevCart =>
+      prevCart.map(item =>
+        item.id === productId ? { ...item, quantity: newQuantity } : item
+      )
+    );
+  };
+
+  return (
+    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateCartQuantity }}>
+      {children}
+    </CartContext.Provider>
+  );
+};
+
+// ----- HEADER COMPONENT -----
 function Header() {
   const { user, logout } = useContext(SessionContext);
 
@@ -27,8 +84,10 @@ function Header() {
   );
 }
 
+// ----- PRODUCT CARD COMPONENT -----
 function ProductCard({ product }) {
   const [quantity, setQuantity] = useState(1);
+  const { addToCart } = useContext(CartContext);
 
   const handleIncrement = () => {
     if (quantity < product.stock) {
@@ -59,13 +118,17 @@ function ProductCard({ product }) {
     }
   };
 
+  const handleAddToCart = () => {
+    addToCart(product, quantity);
+  };
+
   return (
     <div className="product-card">
       <div className="product-image-container">
         <img
           src={product.image_path}
           alt={product.name}
-          className="product-image"
+          className="product-image scale-image"
         />
       </div>
       <div className="product-info">
@@ -97,12 +160,104 @@ function ProductCard({ product }) {
             +
           </button>
         </div>
-        <button className="add-to-cart-btn">Add to Cart</button>
+        <button onClick={handleAddToCart} className="add-to-cart-btn">Add to Cart</button>
       </div>
     </div>
   );
 }
 
+// ----- CART COMPONENT -----
+function Cart() {
+  const { cart, removeFromCart, updateCartQuantity } = useContext(CartContext);
+
+  if (cart.length === 0) return null;
+
+  return (
+    <div className="cart-container">
+      <div className="cart tall-rectangular-cart">
+        <h2>Your Cart</h2>
+        {cart.map(item => {
+          const handleIncrement = () => {
+            if (item.quantity < item.stock) {
+              updateCartQuantity(item.id, item.quantity + 1);
+            }
+          };
+
+          const handleDecrement = () => {
+            if (item.quantity > 1) {
+              updateCartQuantity(item.id, item.quantity - 1);
+            }
+          };
+
+          const handleManualChange = (e) => {
+            const value = e.target.value;
+            if (value === "") {
+              updateCartQuantity(item.id, "");
+              return;
+            }
+            if (!isNaN(value) && value >= 1 && value <= item.stock) {
+              updateCartQuantity(item.id, Number(value));
+            }
+          };
+
+          const handleBlur = (e) => {
+            if (e.target.value === "") {
+              updateCartQuantity(item.id, 1);
+            }
+          };
+
+          return (
+            <div key={item.id} className="cart-item">
+              <img
+                src={item.image_path}
+                alt={item.name}
+                className="cart-item-image scale-image"
+              />
+              <div className="cart-item-details">
+                <p>{item.name}</p>
+                <p>Price: ${item.price}</p>
+
+                {/* Keep quantity and remove on the same horizontal line */}
+                <div className="quantity-selector">
+                  <button
+                    onClick={handleDecrement}
+                    className={`quantity-btn ${item.quantity === 1 ? 'disabled' : ''}`}
+                    disabled={item.quantity === 1}
+                  >
+                    –
+                  </button>
+                  <input
+                    type="text"
+                    value={item.quantity}
+                    onChange={handleManualChange}
+                    onBlur={handleBlur}
+                    className="quantity-input"
+                  />
+                  <button
+                    onClick={handleIncrement}
+                    className={`quantity-btn ${item.quantity === item.stock ? 'disabled' : ''}`}
+                    disabled={item.quantity === item.stock}
+                  >
+                    +
+                  </button>
+                  <button
+                    onClick={() => removeFromCart(item.id)}
+                    className="remove-btn"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        <button className="proceed-btn">Proceed to Payment</button>
+      </div>
+    </div>
+  );
+}
+
+// ----- PRODUCT LISTING COMPONENT -----
 function ProductListing() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -152,7 +307,12 @@ function ProductListing() {
     <div className="App">
       <Header />
       <div className="category-selector">
-        <button onClick={() => setSelectedCategory(null)} className={!selectedCategory ? "active" : ""}>All Products</button>
+        <button
+          onClick={() => setSelectedCategory(null)}
+          className={!selectedCategory ? "active" : ""}
+        >
+          All Products
+        </button>
         {categories.map(category => (
           <button
             key={category}
@@ -187,21 +347,26 @@ function ProductListing() {
           ))
         )}
       </div>
+
+      {/* Render the cart in the bottom right */}
+      <Cart />
     </div>
   );
 }
 
-
+// ----- APP COMPONENT -----
 function App() {
   return (
     <SessionProvider>
-      <Router>
-        <Routes>
-          <Route path="/" element={<ProductListing />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-        </Routes>
-      </Router>
+      <CartProvider>
+        <Router>
+          <Routes>
+            <Route path="/" element={<ProductListing />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+          </Routes>
+        </Router>
+      </CartProvider>
     </SessionProvider>
   );
 }
