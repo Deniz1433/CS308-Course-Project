@@ -89,6 +89,42 @@ app.get("/api/search-products", (req, res) => {
 });
 
 
+<<<<<<< Updated upstream
+=======
+
+// 🔍 Search products by name, category, or description (case-insensitive)
+app.get('/api/search', (req, res) => {
+  const { q } = req.query;
+  if (!q) {
+    return res.status(400).json({ error: "Missing search query" });
+  }
+
+  const searchQuery = `%${q.toLowerCase()}%`;
+
+  const sql = `
+    SELECT * FROM products 
+    WHERE LOWER(name) LIKE ? 
+      OR LOWER(category) LIKE ? 
+      OR LOWER(description) LIKE ?
+  `;
+
+  pool.query(sql, [searchQuery, searchQuery, searchQuery], (error, results) => {
+    if (error) {
+      return res.status(500).json({ error: "Database error" });
+    }
+
+    if (results.length === 0) {
+      return res.status(404).json({ message: "No products found for your search." });
+    }
+
+    res.json(results);
+  });
+});
+
+
+
+
+>>>>>>> Stashed changes
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
