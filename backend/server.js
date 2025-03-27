@@ -35,6 +35,31 @@ app.get('/api/products', (req, res) => {
   });
 });
 
+// Add this endpoint after your existing /api/products endpoint
+app.get('/api/products/:id', (req, res) => {
+  const productId = req.params.id;
+  
+  // Validate the ID is a number
+  if (isNaN(productId)) {
+    return res.status(400).json({ error: 'Invalid product ID' });
+  }
+
+  const query = 'SELECT * FROM products WHERE id = ?';
+  pool.query(query, [productId], (error, results) => {
+    if (error) {
+      console.error('Error fetching product:', error);
+      return res.status(500).json({ error: 'Database error' });
+    }
+    
+    if (results.length === 0) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    
+    res.json(results[0]); // Return the result
+  });
+});
+
+
 // 🟢 Register Endpoint with Password Hashing
 app.post("/api/register", async (req, res) => {
   const { name, email, password, home_address = null } = req.body;
