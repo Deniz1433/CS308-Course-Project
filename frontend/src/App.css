@@ -167,9 +167,6 @@ h1 {
 
 .quantity-input:focus {
   border-color: #f5c518; /* Highlight when focused */
-<<<<<<< Updated upstream
-}
-=======
 }
 
 .add-to-cart-btn {
@@ -407,4 +404,3 @@ html, body {
   border: 1px solid #ccc;
   border-radius: 5px;
 }
->>>>>>> Stashed changes

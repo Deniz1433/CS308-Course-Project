@@ -89,8 +89,6 @@ app.get("/api/search-products", (req, res) => {
 });
 
 
-<<<<<<< Updated upstream
-=======
 
 // 🔍 Search products by name, category, or description (case-insensitive)
 app.get('/api/search', (req, res) => {
@@ -124,7 +122,6 @@ app.get('/api/search', (req, res) => {
 
 
 
->>>>>>> Stashed changes
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
