@@ -280,100 +280,91 @@ function Cart() {
 
 // ----- PRODUCT LISTING COMPONENT -----
 function ProductListing() {
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [selectedCategory, setSelectedCategory] = useState(null);
+    const [products, setProducts] = useState([]);
+    const [selectedCategory, setSelectedCategory] = useState(null);
+    const [sortOption, setSortOption] = useState(null);
+    const [sortOrder, setSortOrder] = useState('asc');
+    const [sortMenuVisible, setSortMenuVisible] = useState(false);
 
-  useEffect(() => {
-    fetch('/api/products')
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`Products API error: ${response.status}`);
-        }
-        return response.json();
-      })
-      .then(data => {
-        setProducts(data);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error('Error fetching data:', err);
-        setError(err.message);
-        setLoading(false);
-      });
-  }, []);
+    useEffect(() => {
+        fetch('/api/products')
+            .then(response => response.json())
+            .then(data => setProducts(data))
+            .catch(error => console.error('Error fetching data:', error));
+    }, []);
 
-  if (loading) {
-    return <div className="App"><p>Loading...</p></div>;
-  }
+    const categories = [...new Set(products.map(p => p.category))];
 
-  if (error) {
-    return <div className="App"><p>Error: {error}</p></div>;
-  }
+    const filteredProducts = selectedCategory
+        ? products.filter(p => p.category === selectedCategory)
+        : products;
 
-  // Group products by category
-  const categorizedProducts = products.reduce((acc, product) => {
-    if (!acc[product.category]) {
-      acc[product.category] = [];
-    }
-    acc[product.category].push(product);
-    return acc;
-  }, {});
+    const sortedProducts = [...filteredProducts].sort((a, b) => {
+        if (!sortOption) return 0;
+        const valueA = sortOption === 'price' ? a.price : a.popularity;
+        const valueB = sortOption === 'price' ? b.price : b.popularity;
+        return sortOrder === 'asc' ? valueA - valueB : valueB - valueA;
+    });
 
-  // Get all unique categories
-  const categories = Object.keys(categorizedProducts);
+    return (
+        <div className="App">
+            <Header />
 
-  return (
-    <div className="App">
-      <Header />
-      <div className="category-selector">
-        <button
-          onClick={() => setSelectedCategory(null)}
-          className={!selectedCategory ? "active" : ""}
-        >
-          All Products
-        </button>
-        {categories.map(category => (
-          <button
-            key={category}
-            onClick={() => setSelectedCategory(category)}
-            className={selectedCategory === category ? "active" : ""}
-          >
-            {category}
-          </button>
-        ))}
-      </div>
-      
-      <div className="product-list">
-        {selectedCategory ? (
-          <div key={selectedCategory}>
-            <h2 className="category-title">{selectedCategory}</h2>
-            <div className="category-products">
-              {categorizedProducts[selectedCategory].map(product => (
-                <ProductCard key={product.id} product={product} />
-              ))}
+            {/* SORT BUTTON */}
+            <div className="sort-container">
+                <button onClick={() => setSortMenuVisible(!sortMenuVisible)} className="sort-button">
+                    Sort
+                </button>
+                {sortMenuVisible && (
+                    <div className="sort-menu">
+                        <label>
+                            <input
+                                type="radio"
+                                name="sortOption"
+                                value="price"
+                                onChange={() => setSortOption('price')}
+                            />
+                            Price
+                        </label>
+                        <label>
+                            <input
+                                type="radio"
+                                name="sortOption"
+                                value="popularity"
+                                onChange={() => setSortOption('popularity')}
+                            />
+                            Popularity
+                        </label>
+                        <button onClick={() => setSortOrder('asc')} className="sort-order-btn">Ascending</button>
+                        <button onClick={() => setSortOrder('desc')} className="sort-order-btn">Descending</button>
+                    </div>
+                )}
             </div>
-          </div>
-        ) : (
-          categories.map(category => (
-            <div key={category}>
-              <h2 className="category-title">{category}</h2>
-              <div className="category-products">
-                {categorizedProducts[category].map(product => (
-                  <ProductCard key={product.id} product={product} />
+
+            {/* CATEGORY SELECTOR */}
+            <div className="category-selector">
+                <button onClick={() => setSelectedCategory(null)} className={!selectedCategory ? 'active' : ''}>
+                    All Products
+                </button>
+                {categories.map(category => (
+                    <button key={category} onClick={() => setSelectedCategory(category)} className={selectedCategory === category ? 'active' : ''}>
+                        {category}
+                    </button>
                 ))}
-              </div>
             </div>
-          ))
-        )}
-      </div>
 
-      {/* Render the cart in the bottom right */}
-      <Cart />
-    </div>
-  );
+            {/* PRODUCT LIST */}
+            <div className="product-list">
+                {sortedProducts.map(product => (
+                    <ProductCard key={product.id} product={product} />
+                ))}
+            </div>
+            {/* Render the cart in the bottom right */}
+            <Cart />
+        </div>
+    );
 }
+
 
 // ----- APP COMPONENT -----
 function App() {
