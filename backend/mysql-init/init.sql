@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS products (
   category VARCHAR(100) NOT NULL,
   price DECIMAL(10,2) NOT NULL,
   stock INT DEFAULT 0,
+  popularity INT DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   image_path VARCHAR(255) DEFAULT NULL
@@ -80,8 +81,8 @@ CREATE TABLE IF NOT EXISTS wishlists (
   FOREIGN KEY (product_id) REFERENCES products(id)
 ) ENGINE=InnoDB;
 
-INSERT INTO products (name, description, category, price, stock, image_path)
+INSERT INTO products (name, description, category, price, stock, image_path, popularity)
 VALUES 
-  ('Laptop Pro', 'A powerful laptop for professionals', 'Electronics', 1299.99, 50, 'product_images/laptop_pro.jpg'),
-  ('Wireless Headphones', 'Noise-cancelling over-ear headphones', 'Electronics', 199.99, 100, 'product_images/headphones.jpg'),
-  ('Smartwatch X', 'Feature-packed smartwatch with health tracking', 'Wearables', 299.99, 75, 'product_images/smartwatch_x.jpg');
+  ('Laptop Pro', 'A powerful laptop for professionals', 'Electronics', 1299.99, 50, 'product_images/laptop_pro.jpg', 6),
+  ('Wireless Headphones', 'Noise-cancelling over-ear headphones', 'Electronics', 199.99, 100, 'product_images/headphones.jpg', 7),
+  ('Smartwatch X', 'Feature-packed smartwatch with health tracking', 'Wearables', 299.99, 75, 'product_images/smartwatch_x.jpg', 5);

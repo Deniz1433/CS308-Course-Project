@@ -4,23 +4,25 @@ services:
   mysql:
     image: mysql:8
     container_name: mysql_container
+    restart: always
     environment:
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
-      - MYSQL_DATABASE=ecommerce
-      - MYSQL_ROOT_HOST=%
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ecommerce
+      MYSQL_ROOT_HOST: "%"
     volumes:
       - db_data:/var/lib/mysql
-      - ./backend/mysql-init:/docker-entrypoint-initdb.d  # Ensure the correct path
+      - ./mysql-init:/docker-entrypoint-initdb.d  # Ensure correct path
     ports:
       - "3306:3306"
 
   backend:
     build: ./backend
     container_name: backend_container
+    restart: always
     ports:
       - "5000:5000"
     volumes:
-      - ./backend:/usr/src/app  # Ensure correct path
+      - ./backend:/usr/src/app
       - /usr/src/app/node_modules  # Prevent overwriting node_modules
     working_dir: /usr/src/app
     depends_on:
@@ -35,6 +37,7 @@ services:
   frontend:
     build: ./frontend
     container_name: frontend_container
+    restart: always
     ports:
       - "3000:3000"
     volumes:
