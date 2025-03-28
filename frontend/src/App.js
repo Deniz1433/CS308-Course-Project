@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import './App.css';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ProductPage from './pages/ProductPage';
 import { SessionProvider, SessionContext } from './middleware/SessionManager';
 
 // ----- CART CONTEXT AND PROVIDER -----
@@ -132,7 +133,11 @@ function ProductCard({ product }) {
         />
       </div>
       <div className="product-info">
-        <h2 className="product-name">{product.name}</h2>
+        <h2 className="product-name">
+          <Link to={`/product-page/${product.id}`}>
+              {product.name}
+          </Link>
+        </h2>
         <p className="product-description">{product.description}</p>
         <p className="product-category">Category: {product.category}</p>
         <p className="product-price">Price: ${product.price}</p>
@@ -364,6 +369,7 @@ function App() {
             <Route path="/" element={<ProductListing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/product-page/:id" element={<ProductPage />} />
           </Routes>
         </Router>
       </CartProvider>
