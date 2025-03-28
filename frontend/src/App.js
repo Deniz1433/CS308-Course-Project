@@ -1,8 +1,10 @@
+// src/App.js
 import React, { useState, useEffect, useContext, createContext } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from 'react-router-dom';
 import './App.css';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import Payment from './pages/Payment';
 import { SessionProvider, SessionContext } from './middleware/SessionManager';
 
 // ----- CART CONTEXT AND PROVIDER -----
@@ -169,8 +171,12 @@ function ProductCard({ product }) {
 // ----- CART COMPONENT -----
 function Cart() {
   const { cart, removeFromCart, updateCartQuantity } = useContext(CartContext);
+  const navigate = useNavigate();
 
   if (cart.length === 0) return null;
+
+  // Compute total price from cart items
+  const total = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
 
   return (
     <div className="cart-container">
@@ -216,8 +222,6 @@ function Cart() {
               <div className="cart-item-details">
                 <p>{item.name}</p>
                 <p>Price: ${item.price}</p>
-
-                {/* Keep quantity and remove on the same horizontal line */}
                 <div className="quantity-selector">
                   <button
                     onClick={handleDecrement}
@@ -251,7 +255,13 @@ function Cart() {
             </div>
           );
         })}
-        <button className="proceed-btn">Proceed to Payment</button>
+        {/* Display the total amount */}
+        <div className="cart-total">
+          <p>Total: ${total.toFixed(2)}</p>
+        </div>
+        <button className="proceed-btn" onClick={() => navigate('/payment')}>
+          Proceed to Payment
+        </button>
       </div>
     </div>
   );
@@ -364,6 +374,7 @@ function App() {
             <Route path="/" element={<ProductListing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/payment" element={<Payment />} />
           </Routes>
         </Router>
       </CartProvider>
