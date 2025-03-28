@@ -3,7 +3,7 @@ const express = require("express");
 const mysql = require("mysql2");
 const bcrypt = require("bcryptjs");
 const cors = require("cors");
-const backendSession = require('./sessionmanager'); // Adjust the path as needed
+const backendSession = require('./sessionmanager'); // Adjust path as needed
 require("dotenv").config();
 
 const app = express();

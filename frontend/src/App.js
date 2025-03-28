@@ -171,6 +171,7 @@ function ProductCard({ product }) {
 // ----- CART COMPONENT -----
 function Cart() {
   const { cart, removeFromCart, updateCartQuantity } = useContext(CartContext);
+  const { user } = useContext(SessionContext);
   const navigate = useNavigate();
 
   if (cart.length === 0) return null;
@@ -259,7 +260,17 @@ function Cart() {
         <div className="cart-total">
           <p>Total: ${total.toFixed(2)}</p>
         </div>
-        <button className="proceed-btn" onClick={() => navigate('/payment')}>
+        <button
+          className="proceed-btn"
+          onClick={() => {
+            // If not logged in, redirect to login with a redirect state
+            if (!user) {
+              navigate('/login', { state: { from: '/payment' } });
+            } else {
+              navigate('/payment');
+            }
+          }}
+        >
           Proceed to Payment
         </button>
       </div>
