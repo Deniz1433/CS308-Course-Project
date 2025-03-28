@@ -358,3 +358,14 @@ html, body {
 .proceed-btn:hover {
   background: #218838;
 }
+
+
+.search-form {
+  width: 100%;
+  max-width: 500px;
+  margin: 20px auto;
+  padding: 10px;
+  font-size: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}

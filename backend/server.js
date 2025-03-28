@@ -1,29 +1,40 @@
-const express = require("express");
-const mysql = require("mysql2");
-const bcrypt = require("bcryptjs");
-const cors = require("cors");
-const backendSession = require('./sessionmanager'); // Notice the path adjusted to backend/sessionmanager.js
+const express = require('express');
+const mysql = require('mysql2');
+const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 
-require("dotenv").config();
+require('dotenv').config();
+
 const app = express();
 const port = 5000;
 
-app.use('/product_images', express.static('product_images'));
-app.use(cors());
-app.use(express.json()); // Enable JSON parsing
-app.use(backendSession); // Use the session middleware
+const corsOptions = {
+  origin: 'http://localhost:3000', // or your production origin
+  optionsSuccessStatus: 200,
+};
+app.use(cors(corsOptions));
 
-// Database connection
+// Serve static files from the product_images folder
+app.use('/product_images', express.static('product_images'));
+
+
+if (!process.env.DB_PASSWORD) {
+  throw new Error("Missing DB_PASSWORD environment variable. Please set it in your environment or .env file.");
+}
+
+// Create a connection pool using environment variables.
 const pool = mysql.createPool({
-  host: process.env.DB_HOST || "localhost",
-  user: process.env.DB_USER || "root",
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME || "ecommerce",
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD, // Must be provided
+  database: process.env.DB_NAME || 'ecommerce',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
 });
 
+// Products API
 app.get('/api/products', (req, res) => {
   const query = 'SELECT * FROM products';
   pool.query(query, (error, results) => {
@@ -35,72 +46,81 @@ app.get('/api/products', (req, res) => {
   });
 });
 
-// 🟢 Register Endpoint with Password Hashing
-app.post("/api/register", async (req, res) => {
-  const { name, email, password, home_address = null } = req.body;
-  if (!name || !email || !password) {
-    return res.status(400).json({ error: "Name, Email, and Password are required" });
-  }
-
-  try {
-    // Check if the user already exists
-    const [existingUser] = await pool
-      .promise()
-      .query("SELECT id FROM users WHERE email = ?", [email]);
-
-    if (existingUser.length > 0) {
-      return res.status(400).json({ error: "Email is already registered" });
+// Images API: returns a list of image URLs
+app.get('/api/images', (req, res) => {
+  const imagesDir = path.join(__dirname, 'product_images');
+  fs.readdir(imagesDir, (err, files) => {
+    if (err) {
+      console.error('Error reading images directory:', err);
+      return res.status(500).json({ error: 'Unable to scan images folder' });
     }
-
-    // Hash the password
-    const hashedPassword = bcrypt.hashSync(password, 10);
-
-    // Insert new user
-    await pool
-      .promise()
-      .query(
-        "INSERT INTO users (name, email, home_address, password) VALUES (?, ?, ?, ?)",
-        [name, email, home_address, hashedPassword]
-      );
-
-    res.status(201).json({ message: "User registered successfully" });
-  } catch (error) {
-    console.error("Registration error:", error);
-    res.status(500).json({ error: "Server error" });
-  }
+    const imageUrls = files.map(file => {
+      // Build a relative URL that will work with the reverse proxy.
+      return `/product_images/${file}`;
+    });
+    res.json(imageUrls);
+  });
 });
 
-// 🟢 Login Endpoint with Password Verification
-app.post("/api/login", async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ error: "All fields are required" });
+
+// 🟢 Search Products by Name or Description
+app.get("/api/search-products", (req, res) => {
+  const { query } = req.query;
+
+  if (!query) {
+    return res.status(400).json({ error: "Search query is required" });
   }
 
-  try {
-    // Get user from DB
-    const [user] = await pool
-      .promise()
-      .query("SELECT * FROM users WHERE email = ?", [email]);
+  const searchQuery = `
+    SELECT * FROM products 
+    WHERE LOWER(name) LIKE LOWER(?) 
+       OR LOWER(description) LIKE LOWER(?)
+  `;
 
-    if (user.length === 0) {
-      return res.status(401).json({ error: "Invalid email or password" });
+  const searchTerm = `%${query}%`; // Wildcard search
+
+  pool.query(searchQuery, [searchTerm, searchTerm], (error, results) => {
+    if (error) {
+      console.error("Error searching products:", error);
+      return res.status(500).json({ error: "Database error" });
     }
-
-    const isValidPassword = bcrypt.compareSync(password, user[0].password);
-    if (!isValidPassword) {
-      return res.status(401).json({ error: "Invalid email or password" });
-    }
-
-    // Store user info in the session
-    req.session.user = { id: user[0].id, name: user[0].name, email: user[0].email };
-
-    res.status(200).json({ message: "Login successful", user: req.session.user });
-  } catch (error) {
-    console.error("Login error:", error);
-    res.status(500).json({ error: "Server error" });
-  }
+    res.json(results);
+  });
 });
+
+
+
+// 🔍 Search products by name, category, or description (case-insensitive)
+app.get('/api/search', (req, res) => {
+  const { q } = req.query;
+  if (!q) {
+    return res.status(400).json({ error: "Missing search query" });
+  }
+
+  const searchQuery = `%${q.toLowerCase()}%`;
+
+  const sql = `
+    SELECT * FROM products 
+    WHERE LOWER(name) LIKE ? 
+      OR LOWER(category) LIKE ? 
+      OR LOWER(description) LIKE ?
+  `;
+
+  pool.query(sql, [searchQuery, searchQuery, searchQuery], (error, results) => {
+    if (error) {
+      return res.status(500).json({ error: "Database error" });
+    }
+
+    if (results.length === 0) {
+      return res.status(404).json({ message: "No products found for your search." });
+    }
+
+    res.json(results);
+  });
+});
+
+
+
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
