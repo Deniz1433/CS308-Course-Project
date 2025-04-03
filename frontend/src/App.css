@@ -399,3 +399,15 @@ html, body {
     flex: 1;
 }
 
+.search-bar-container {
+  display: flex;
+  justify-content: center;
+  margin: 1rem 0;
+}
+
+.search-bar {
+  padding: 0.5rem;
+  width: 300px;
+  border-radius: 5px;
+  border: 1px solid #ddd;
+}

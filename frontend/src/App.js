@@ -280,89 +280,106 @@ function Cart() {
 
 // ----- PRODUCT LISTING COMPONENT -----
 function ProductListing() {
-    const [products, setProducts] = useState([]);
-    const [selectedCategory, setSelectedCategory] = useState(null);
-    const [sortOption, setSortOption] = useState(null);
-    const [sortOrder, setSortOrder] = useState('asc');
-    const [sortMenuVisible, setSortMenuVisible] = useState(false);
+  const [products, setProducts] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [sortOption, setSortOption] = useState(null);
+  const [sortOrder, setSortOrder] = useState('asc');
+  const [sortMenuVisible, setSortMenuVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState(''); // New state for search query
 
-    useEffect(() => {
-        fetch('/api/products')
-            .then(response => response.json())
-            .then(data => setProducts(data))
-            .catch(error => console.error('Error fetching data:', error));
-    }, []);
+  useEffect(() => {
+      fetch('/api/products')
+          .then(response => response.json())
+          .then(data => setProducts(data))
+          .catch(error => console.error('Error fetching data:', error));
+  }, []);
 
-    const categories = [...new Set(products.map(p => p.category))];
+  const categories = [...new Set(products.map(p => p.category))];
 
-    const filteredProducts = selectedCategory
-        ? products.filter(p => p.category === selectedCategory)
-        : products;
+  // Filter products by category and search query
+  const filteredProducts = products.filter(product => {
+      const matchesCategory = selectedCategory ? product.category === selectedCategory : true;
+      const matchesSearchQuery = product.name.toLowerCase().includes(searchQuery.toLowerCase())
+          || product.category.toLowerCase().includes(searchQuery.toLowerCase())
+          || product.description.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesCategory && matchesSearchQuery;
+  });
 
-    const sortedProducts = [...filteredProducts].sort((a, b) => {
-        if (!sortOption) return 0;
-        const valueA = sortOption === 'price' ? a.price : a.popularity;
-        const valueB = sortOption === 'price' ? b.price : b.popularity;
-        return sortOrder === 'asc' ? valueA - valueB : valueB - valueA;
-    });
+  const sortedProducts = [...filteredProducts].sort((a, b) => {
+      if (!sortOption) return 0;
+      const valueA = sortOption === 'price' ? a.price : a.popularity;
+      const valueB = sortOption === 'price' ? b.price : b.popularity;
+      return sortOrder === 'asc' ? valueA - valueB : valueB - valueA;
+  });
 
-    return (
-        <div className="App">
-            <Header />
+  return (
+      <div className="App">
+          <Header />
 
-            {/* SORT BUTTON */}
-            <div className="sort-container">
-                <button onClick={() => setSortMenuVisible(!sortMenuVisible)} className="sort-button">
-                    Sort
-                </button>
-                {sortMenuVisible && (
-                    <div className="sort-menu">
-                        <label>
-                            <input
-                                type="radio"
-                                name="sortOption"
-                                value="price"
-                                onChange={() => setSortOption('price')}
-                            />
-                            Price
-                        </label>
-                        <label>
-                            <input
-                                type="radio"
-                                name="sortOption"
-                                value="popularity"
-                                onChange={() => setSortOption('popularity')}
-                            />
-                            Popularity
-                        </label>
-                        <button onClick={() => setSortOrder('asc')} className="sort-order-btn">Ascending</button>
-                        <button onClick={() => setSortOrder('desc')} className="sort-order-btn">Descending</button>
-                    </div>
-                )}
-            </div>
+          {/* SEARCH BAR */}
+          <div className="search-bar-container">
+              <input
+                  type="text"
+                  placeholder="Search by name, category, or description..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="search-bar"
+              />
+          </div>
 
-            {/* CATEGORY SELECTOR */}
-            <div className="category-selector">
-                <button onClick={() => setSelectedCategory(null)} className={!selectedCategory ? 'active' : ''}>
-                    All Products
-                </button>
-                {categories.map(category => (
-                    <button key={category} onClick={() => setSelectedCategory(category)} className={selectedCategory === category ? 'active' : ''}>
-                        {category}
-                    </button>
-                ))}
-            </div>
+          {/* SORT BUTTON */}
+          <div className="sort-container">
+              <button onClick={() => setSortMenuVisible(!sortMenuVisible)} className="sort-button">
+                  Sort
+              </button>
+              {sortMenuVisible && (
+                  <div className="sort-menu">
+                      <label>
+                          <input
+                              type="radio"
+                              name="sortOption"
+                              value="price"
+                              onChange={() => setSortOption('price')}
+                          />
+                          Price
+                      </label>
+                      <label>
+                          <input
+                              type="radio"
+                              name="sortOption"
+                              value="popularity"
+                              onChange={() => setSortOption('popularity')}
+                          />
+                          Popularity
+                      </label>
+                      <button onClick={() => setSortOrder('asc')} className="sort-order-btn">Ascending</button>
+                      <button onClick={() => setSortOrder('desc')} className="sort-order-btn">Descending</button>
+                  </div>
+              )}
+          </div>
 
-            {/* PRODUCT LIST */}
-            <div className="product-list">
-                {sortedProducts.map(product => (
-                    <ProductCard key={product.id} product={product} />
-                ))}
-            </div>
-            {/* Render the cart in the bottom right */}
-            <Cart />
-        </div>
-    );
+          {/* CATEGORY SELECTOR */}
+          <div className="category-selector">
+              <button onClick={() => setSelectedCategory(null)} className={!selectedCategory ? 'active' : ''}>
+                  All Products
+              </button>
+              {categories.map(category => (
+                  <button key={category} onClick={() => setSelectedCategory(category)} className={selectedCategory === category ? 'active' : ''}>
+                      {category}
+                  </button>
+              ))}
+          </div>
+
+          {/* PRODUCT LIST */}
+          <div className="product-list">
+              {sortedProducts.map(product => (
+                  <ProductCard key={product.id} product={product} />
+              ))}
+          </div>
+          {/* Render the cart in the bottom right */}
+          <Cart />
+      </div>
+  );
 }
 
 
