@@ -6,6 +6,19 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Payment from './pages/Payment';
 import { SessionProvider, SessionContext } from './middleware/SessionManager';
+import {
+    Card,
+    CardMedia,
+    CardContent,
+    Typography,
+    IconButton,
+    Button,
+    TextField,
+    Box,
+    Collapse
+} from "@mui/material";
+import { Add, Remove } from "@mui/icons-material";
+import { ExpandLess, ExpandMore } from '@mui/icons-material';
 
 // ----- CART CONTEXT AND PROVIDER -----
 export const CartContext = createContext();
@@ -88,194 +101,286 @@ function Header() {
 
 // ----- PRODUCT CARD COMPONENT -----
 function ProductCard({ product }) {
-  const [quantity, setQuantity] = useState(1);
-  const { addToCart } = useContext(CartContext);
+    const [quantity, setQuantity] = useState(1);
+    const { addToCart } = useContext(CartContext);
 
-  const handleIncrement = () => {
-    if (quantity < product.stock) {
-      setQuantity(q => q + 1);
-    }
-  };
+    const handleIncrement = () => {
+        if (quantity < product.stock) {
+            setQuantity((q) => q + 1);
+        }
+    };
 
-  const handleDecrement = () => {
-    if (quantity > 1) {
-      setQuantity(q => q - 1);
-    }
-  };
+    const handleDecrement = () => {
+        if (quantity > 1) {
+            setQuantity((q) => q - 1);
+        }
+    };
 
-  const handleManualChange = (e) => {
-    const value = e.target.value;
-    if (value === "") {
-      setQuantity("");
-      return;
-    }
-    if (!isNaN(value) && value >= 1 && value <= product.stock) {
-      setQuantity(Number(value));
-    }
-  };
+    const handleManualChange = (e) => {
+        const value = e.target.value;
+        if (value === "") {
+            setQuantity("");
+            return;
+        }
+        if (!isNaN(value) && value >= 1 && value <= product.stock) {
+            setQuantity(Number(value));
+        }
+    };
 
-  const handleBlur = (e) => {
-    if (e.target.value === "") {
-      setQuantity(1);
-    }
-  };
+    const handleBlur = (e) => {
+        if (e.target.value === "") {
+            setQuantity(1);
+        }
+    };
 
-  const handleAddToCart = () => {
-    addToCart(product, quantity);
-  };
+    const handleAddToCart = () => {
+        addToCart(product, quantity);
+    };
 
-  return (
-    <div className="product-card">
-      <div className="product-image-container">
-        <img
-          src={product.image_path}
-          alt={product.name}
-          className="product-image scale-image"
-        />
-      </div>
-      <div className="product-info">
-        <h2 className="product-name">{product.name}</h2>
-        <p className="product-description">{product.description}</p>
-        <p className="product-category">Category: {product.category}</p>
-        <p className="product-price">Price: ${product.price}</p>
-        <p className="product-stock">Stock: {product.stock}</p>
-        <div className="quantity-selector">
-          <button
-            onClick={handleDecrement}
-            className={`quantity-btn ${quantity === 1 ? 'disabled' : ''}`}
-            disabled={quantity === 1}
-          >
-            –
-          </button>
-          <input
-            type="text"
-            value={quantity}
-            onChange={handleManualChange}
-            onBlur={handleBlur}
-            className="quantity-input"
-          />
-          <button
-            onClick={handleIncrement}
-            className={`quantity-btn ${quantity === product.stock ? 'disabled' : ''}`}
-            disabled={quantity === product.stock}
-          >
-            +
-          </button>
-        </div>
-        <button onClick={handleAddToCart} className="add-to-cart-btn">Add to Cart</button>
-      </div>
-    </div>
-  );
+    return (
+        <Card
+            sx={{
+                display: "flex",
+                flexDirection: "column",
+                maxWidth: 350,
+                backgroundColor: "#1e1e1e",
+                color: "#fff",
+                borderRadius: 3,
+                overflow: "hidden",
+                boxShadow: 6,
+            }}
+        >
+            <CardMedia
+                component="img"
+                height="200"
+                image={product.image_path}
+                alt={product.name}
+                sx={{ objectFit: "cover" }}
+            />
+            <CardContent sx={{ px: 3, pb: 2 }}>
+                <Typography variant="h6" gutterBottom>
+                    {product.name}
+                </Typography>
+                <Typography variant="body2" color="gray" gutterBottom>
+                    {product.description}
+                </Typography>
+                <Typography variant="body2" color="gray">
+                    Category: {product.category}
+                </Typography>
+                <Typography variant="body1" sx={{ mt: 1 }}>
+                    Price: ${product.price}
+                </Typography>
+                <Typography variant="body2" color="gray">
+                    Stock: {product.stock}
+                </Typography>
+
+                <Box
+                    sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        mt: 2,
+                        mb: 1,
+                        gap: 1,
+                    }}
+                >
+                    <IconButton
+                        onClick={handleDecrement}
+                        disabled={quantity === 1}
+                        sx={{ color: "white", border: "1px solid gray" }}
+                    >
+                        <Remove />
+                    </IconButton>
+                    <TextField
+                        value={quantity}
+                        onChange={handleManualChange}
+                        onBlur={handleBlur}
+                        inputProps={{
+                            style: {
+                                textAlign: "center",
+                                width: "40px",
+                                padding: "6px",
+                                color: "white",
+                            },
+                        }}
+                        sx={{
+                            "& .MuiInputBase-root": {
+                                backgroundColor: "#2b2b2b",
+                            },
+                            "& input": {
+                                textAlign: "center",
+                            },
+                            width: "60px",
+                        }}
+                    />
+                    <IconButton
+                        onClick={handleIncrement}
+                        disabled={quantity === product.stock}
+                        sx={{ color: "white", border: "1px solid gray" }}
+                    >
+                        <Add />
+                    </IconButton>
+                </Box>
+
+                <Button
+                    variant="contained"
+                    color="primary"
+                    fullWidth
+                    sx={{
+                        mt: 1,
+                        bgcolor: "#1976d2",
+                        "&:hover": {
+                            bgcolor: "#1565c0",
+                        },
+                    }}
+                    onClick={handleAddToCart}
+                >
+                    Add to Cart
+                </Button>
+            </CardContent>
+        </Card>
+    );
 }
 
 // ----- CART COMPONENT -----
+
 function Cart() {
-  const { cart, removeFromCart, updateCartQuantity } = useContext(CartContext);
-  const { user } = useContext(SessionContext);
-  const navigate = useNavigate();
+    const { cart, removeFromCart, updateCartQuantity } = useContext(CartContext);
+    const { user } = useContext(SessionContext);
+    const navigate = useNavigate();
+    const [showCart, setShowCart] = useState(true);
 
-  if (cart.length === 0) return null;
+    if (cart.length === 0) return null;
 
-  // Compute total price from cart items
-  const total = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
+    const total = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
 
-  return (
-    <div className="cart-container">
-      <div className="cart tall-rectangular-cart">
-        <h2>Your Cart</h2>
-        {cart.map(item => {
-          const handleIncrement = () => {
-            if (item.quantity < item.stock) {
-              updateCartQuantity(item.id, item.quantity + 1);
-            }
-          };
-
-          const handleDecrement = () => {
-            if (item.quantity > 1) {
-              updateCartQuantity(item.id, item.quantity - 1);
-            }
-          };
-
-          const handleManualChange = (e) => {
-            const value = e.target.value;
-            if (value === "") {
-              updateCartQuantity(item.id, "");
-              return;
-            }
-            if (!isNaN(value) && value >= 1 && value <= item.stock) {
-              updateCartQuantity(item.id, Number(value));
-            }
-          };
-
-          const handleBlur = (e) => {
-            if (e.target.value === "") {
-              updateCartQuantity(item.id, 1);
-            }
-          };
-
-          return (
-            <div key={item.id} className="cart-item">
-              <img
-                src={item.image_path}
-                alt={item.name}
-                className="cart-item-image scale-image"
-              />
-              <div className="cart-item-details">
-                <p>{item.name}</p>
-                <p>Price: ${item.price}</p>
-                <div className="quantity-selector">
-                  <button
-                    onClick={handleDecrement}
-                    className={`quantity-btn ${item.quantity === 1 ? 'disabled' : ''}`}
-                    disabled={item.quantity === 1}
-                  >
-                    –
-                  </button>
-                  <input
-                    type="text"
-                    value={item.quantity}
-                    onChange={handleManualChange}
-                    onBlur={handleBlur}
-                    className="quantity-input"
-                  />
-                  <button
-                    onClick={handleIncrement}
-                    className={`quantity-btn ${item.quantity === item.stock ? 'disabled' : ''}`}
-                    disabled={item.quantity === item.stock}
-                  >
-                    +
-                  </button>
-                  <button
-                    onClick={() => removeFromCart(item.id)}
-                    className="remove-btn"
-                  >
-                    Remove
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-        {/* Display the total amount */}
-        <div className="cart-total">
-          <p>Total: ${total.toFixed(2)}</p>
-        </div>
-        <button
-          className="proceed-btn"
-          onClick={() => {
-            // If not logged in, redirect to login with a redirect state
-            if (!user) {
-              navigate('/login', { state: { from: '/payment' } });
-            } else {
-              navigate('/payment');
-            }
-          }}
+    return (
+        <Box
+            sx={{
+                position: 'fixed',
+                bottom: 16,
+                right: 16,
+                zIndex: 9999,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-end',
+            }}
         >
-          Proceed to Payment
-        </button>
-      </div>
-    </div>
-  );
+            <Button
+                variant="contained"
+                startIcon={showCart ? <ExpandLess /> : <ExpandMore />}
+                onClick={() => setShowCart(prev => !prev)}
+                sx={{ mb: 1 }}
+            >
+
+                {showCart ? 'Hide Cart' : 'Show Cart'}
+            </Button>
+
+            <Collapse in={showCart}>
+                <Box
+                    className="cart tall-rectangular-cart"
+                    sx={{
+                        width: 350,
+                        maxHeight: '80vh',
+                        overflowY: 'auto',
+                        p: 2,
+                        border: '1px solid #ccc',
+                        borderRadius: 2,
+                        backgroundColor: '#fff',
+                        boxShadow: 3,
+                    }}
+                >
+                    <Typography variant="h5" gutterBottom>Your Cart</Typography>
+                    {cart.map(item => {
+                        const handleIncrement = () => {
+                            if (item.quantity < item.stock) {
+                                updateCartQuantity(item.id, item.quantity + 1);
+                            }
+                        };
+
+                        const handleDecrement = () => {
+                            if (item.quantity > 1) {
+                                updateCartQuantity(item.id, item.quantity - 1);
+                            }
+                        };
+
+                        const handleManualChange = (e) => {
+                            const value = e.target.value;
+                            if (value === "") {
+                                updateCartQuantity(item.id, "");
+                                return;
+                            }
+                            if (!isNaN(value) && value >= 1 && value <= item.stock) {
+                                updateCartQuantity(item.id, Number(value));
+                            }
+                        };
+
+                        const handleBlur = (e) => {
+                            if (e.target.value === "") {
+                                updateCartQuantity(item.id, 1);
+                            }
+                        };
+
+                        return (
+                            <Box key={item.id} sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                                <img
+                                    src={item.image_path}
+                                    alt={item.name}
+                                    style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 8 }}
+                                />
+                                <Box>
+                                    <Typography>{item.name}</Typography>
+                                    <Typography variant="body2">Price: ${item.price}</Typography>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+                                        <Button variant="outlined" size="small" onClick={handleDecrement} disabled={item.quantity === 1}>–</Button>
+                                        <input
+                                            type="text"
+                                            value={item.quantity}
+                                            onChange={handleManualChange}
+                                            onBlur={handleBlur}
+                                            style={{
+                                                width: 40,
+                                                textAlign: 'center',
+                                                margin: '0 8px',
+                                                padding: '4px',
+                                                border: '1px solid #ccc',
+                                                borderRadius: 4
+                                            }}
+                                        />
+                                        <Button variant="outlined" size="small" onClick={handleIncrement} disabled={item.quantity === item.stock}>+</Button>
+                                        <Button
+                                            onClick={() => removeFromCart(item.id)}
+                                            variant="text"
+                                            color="error"
+                                            sx={{ ml: 2 }}
+                                        >
+                                            Remove
+                                        </Button>
+                                    </Box>
+                                </Box>
+                            </Box>
+                        );
+                    })}
+                    <Box sx={{ mt: 2 }}>
+                        <Typography variant="h6">Total: ${total.toFixed(2)}</Typography>
+                    </Box>
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        sx={{ mt: 2 }}
+                        onClick={() => {
+                            if (!user) {
+                                navigate('/login', { state: { from: '/payment' } });
+                            } else {
+                                navigate('/payment');
+                            }
+                        }}
+                    >
+                        Proceed to Payment
+                    </Button>
+                </Box>
+            </Collapse>
+        </Box>
+    );
 }
 
 // ----- PRODUCT LISTING COMPONENT -----
