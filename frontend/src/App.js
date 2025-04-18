@@ -298,18 +298,20 @@ function Cart() {
 
             <Collapse in={showCart}>
                 <Box
-                    className="cart tall-rectangular-cart"
-                    sx={{
-                        width: 350,
-                        maxHeight: '80vh',
-                        overflowY: 'auto',
-                        p: 2,
-                        border: '1px solid #ccc',
-                        borderRadius: 2,
-                        backgroundColor: '#fff',
-                        boxShadow: 3,
-                    }}
-                >
+					  className="cart tall-rectangular-cart"
+					  sx={{
+						width: { xs: '100%', sm: 400, md: 500 },   // → full‑width on mobile, 400px on small screens, 500px on medium+
+						maxWidth: '22vw',                          // → never wider than 90% of viewport
+						overflowY: 'auto',
+						overflowX: 'hidden',                       // → hide any horizontal overflow
+						p: 2,
+						border: '1px solid #ccc',
+						borderRadius: 2,
+						backgroundColor: '#fff',
+						boxShadow: 3,
+					  }}
+					>
+
                     <Typography variant="h5" gutterBottom>Your Cart</Typography>
                     {cart.map(item => {
                         const handleIncrement = () => {
