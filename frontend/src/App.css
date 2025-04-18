@@ -164,7 +164,7 @@ h1 {
 
 /* Login button styling */
 .login-btn {
-  position: absolute;
+  position: static;
   top: 20px;
   right: 20px;
   padding: 8px 12px;
@@ -225,7 +225,7 @@ h1 {
 
 /* Logout button styling */
 .logout-btn {
-  position: absolute;
+  position: static;
   top: 20px;
   right: 20px;
   padding: 8px 12px;
@@ -631,3 +631,83 @@ html, body {
   font-size: 0.95rem;
   color: #576574;
 }
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  position: relative;
+}
+
+.left-buttons {
+  flex: 1;
+}
+
+.right-buttons {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.header-buttons {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.welcome-msg {
+  font-size: 1rem;
+  color: #333;
+}
+
+.orders-btn {
+  background-color: #f5c518;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  color: #333;
+}
+
+.orders-btn:hover {
+  background-color: #e0b307;
+}
+/* Top bar layout */
+.header-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  position: relative;
+}
+
+/* Grouping the controls to the right */
+.user-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: absolute;
+  right: 24px;
+  top: 16px;
+}
+
+.welcome-msg {
+  color: #111;
+  font-weight: 500;
+}
+
+.orders-btn {
+  background-color: #f5c518;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  color: #333;
+}
+
+.orders-btn:hover {
+  background-color: #e0b307;
+}
+

@@ -11,7 +11,7 @@ services:
       MYSQL_ROOT_HOST: "%"
     volumes:
       - db_data:/var/lib/mysql
-      - ./mysql-init:/docker-entrypoint-initdb.d  # Ensure correct path
+      - ./backend/mysql-init:/docker-entrypoint-initdb.d  
     ports:
       - "3306:3306"
 

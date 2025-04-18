@@ -13,7 +13,7 @@ import {
 } from '@mui/material';
 
 const Payment = () => {
-  const { cart } = useContext(CartContext);
+  const { cart, clearCart } = useContext(CartContext);
   const total = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
   const { user } = useContext(SessionContext);
   const navigate = useNavigate();
@@ -27,53 +27,76 @@ const Payment = () => {
   const [cardNumber, setCardNumber] = useState('');
   const [expiry, setExpiry] = useState('');
   const [cvv, setCvv] = useState('');
-    const [message, setMessage] = useState('');
-    const [alertSeverity, setAlertSeverity] = useState('success');
+  const [message, setMessage] = useState('');
+  const [alertSeverity, setAlertSeverity] = useState('success');
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-        // Simple validation
-        if (!/^\d{16}$/.test(cardNumber)) {
-            setAlertSeverity('error');
-            setMessage('Card number must be 16 digits.');
-            return;
-        }
+    // Simple validation
+    if (!/^\d{16}$/.test(cardNumber)) {
+      setAlertSeverity('error');
+      setMessage('Card number must be 16 digits.');
+      return;
+    }
 
-        if (!/^\d{2}\/\d{2}$/.test(expiry)) {
-            setMessage('Expiry must be in MM/YY format.');
-            return;
-        }
+    if (!/^\d{2}\/\d{2}$/.test(expiry)) {
+      setAlertSeverity('error');
+      setMessage('Expiry must be in MM/YY format.');
+      return;
+    }
 
-        // Check if expiry is in the future
-        const [mm, yy] = expiry.split('/').map(Number);
-        const expiryDate = new Date(`20${yy}`, mm); // first day of next month
-        const now = new Date();
-        if (expiryDate <= now) {
-            setMessage('Card has expired.');
-            return;
-        }
+    const [mm, yy] = expiry.split('/').map(Number);
+    const expiryDate = new Date(`20${yy}`, mm);
+    const now = new Date();
+    if (expiryDate <= now) {
+      setAlertSeverity('error');
+      setMessage('Card has expired.');
+      return;
+    }
 
-        if (!/^\d{3,4}$/.test(cvv)) {
-            setMessage('CVV must be 3 or 4 digits.');
-            return;
-        }
+    if (!/^\d{3,4}$/.test(cvv)) {
+      setAlertSeverity('error');
+      setMessage('CVV must be 3 or 4 digits.');
+      return;
+    }
 
-        const data = { cardNumber, expiry, cvv, amount: total };
-
-        try {
-            const response = await fetch('/api/payment', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
-            const result = await response.json();
-            setAlertSeverity('success');
-            setMessage(result.message);
-        } catch (error) {
-            setMessage('Payment failed. Please try again.');
-        }
+    const data = {
+      cardNumber,
+      expiry,
+      cvv,
+      amount: total,
+      userId: user?.id,
+      cart: cart.map(item => ({
+        productId: item.id,
+        quantity: item.quantity
+      }))
     };
+
+    try {
+      const response = await fetch('/api/payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      const result = await response.json();
+
+      if (response.ok && result.message === 'Order placed successfully') {
+        setAlertSeverity('success');
+        setMessage('Payment successful! Redirecting...');
+        clearCart?.(); // Optional: only if you have a clearCart method
+        setTimeout(() => {
+          navigate('/');
+        }, 2000);
+      } else {
+        setAlertSeverity('error');
+        setMessage(result.message || 'Payment failed.');
+      }
+    } catch (error) {
+      setAlertSeverity('error');
+      setMessage('Payment failed. Please try again.');
+    }
+  };
 
   return (
     <Container maxWidth="sm" sx={{ mt: 6 }}>
@@ -87,7 +110,7 @@ const Payment = () => {
         }}
       >
         <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: '#d17b00' }}>
-            Payment
+          Payment
         </Typography>
 
         <Typography variant="subtitle1" gutterBottom>
@@ -129,32 +152,29 @@ const Payment = () => {
             InputLabelProps={{ sx: { color: '#aaa' } }}
           />
           <Button
-              type="submit"
-              variant="contained"
-              fullWidth
-              sx={{
-                mt: 2,
-                backgroundColor: '#ff9800',
-                '&:hover': {
-                  backgroundColor: '#e68900',
-                }
-              }}
-           >
-              Pay
-           </Button>
+            type="submit"
+            variant="contained"
+            fullWidth
+            sx={{
+              mt: 2,
+              backgroundColor: '#ff9800',
+              '&:hover': {
+                backgroundColor: '#e68900',
+              }
+            }}
+          >
+            Pay
+          </Button>
         </Box>
 
-            {message && (
-                <Alert severity={alertSeverity} sx={{ mt: 3 }}>
-                    {message}
-                </Alert>
-            )}
-
+        {message && (
+          <Alert severity={alertSeverity} sx={{ mt: 3 }}>
+            {message}
+          </Alert>
+        )}
       </Paper>
     </Container>
   );
 };
 
 export default Payment;
-
-
