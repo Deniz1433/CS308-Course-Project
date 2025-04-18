@@ -5,14 +5,17 @@ This is a course project for CS308 (Software Engineering) at Sabancı University
 ## 🔧 Tech Stack
 
 - Frontend: React.js
-- Backend: Node.js, Express.js
-- Database: MongoDB (or MySQL if needed)
+- Backend: Node.js
+- Database: MySQL
 
 ## 👥 Team Members
 
 - Mehmet Barış Baştuğ
-- Deniz XXX
-- [Other teammates if any]
+- Deniz Yavuzgil
+- Mehmet Utku Ünlü
+- Eren Sönmez
+- Tuna Mintaş
+- Özgür Kıyak
 
 ## 🚀 Features
 
