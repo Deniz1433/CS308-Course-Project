@@ -1,4 +1,6 @@
 // src/App.js
+import ProtectedRoute from './middleware/ProtectedRoute'; 
+import Orders from './pages/Orders';
 import React, { useState, useEffect, useContext, createContext } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from 'react-router-dom';
 import './App.css';
@@ -83,19 +85,24 @@ function Header() {
 
   return (
     <header className="App-header">
-      <div className="header-container">
-        <h1>Product Listings</h1>
+    <div className="header-container">
+        <div className="user-controls">
         {user ? (
-          <div>
-            <span>Welcome, {user.name}!</span>
+            <>
+            <span className="welcome-msg">Welcome, {user.name}!</span>
+            <Link to="/orders">
+                <button className="orders-btn">Orders</button>
+            </Link>
             <button onClick={logout} className="logout-btn">Logout</button>
-          </div>
+            </>
         ) : (
-          <Link to="/login">
+            <Link to="/login">
             <button className="login-btn">Login</button>
-          </Link>
+            </Link>
         )}
-      </div>
+        </div>
+        <h1>Product Listings</h1>
+    </div>
     </header>
   );
 }
@@ -504,21 +511,29 @@ function ProductListing() {
 
 // ----- APP COMPONENT -----
 function App() {
-  return (
-    <SessionProvider>
-      <CartProvider>
-        <Router>
-          <Routes>
-            <Route path="/" element={<ProductListing />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/payment" element={<Payment />} />
-            <Route path="/product-page/:id" element={<ProductPage />} />
-          </Routes>
-        </Router>
-      </CartProvider>
-    </SessionProvider>
-  );
-}
+    return (
+        <SessionProvider>
+        <CartProvider>
+          <Router>
+            <Routes>
+              <Route path="/" element={<ProductListing />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/payment" element={<Payment />} />
+              <Route path="/product-page/:id" element={<ProductPage />} />
+              <Route
+                  path="/orders"
+                  element={
+                    <ProtectedRoute>
+                        <Orders />
+                    </ProtectedRoute>
+                  }
+            />
+            </Routes>
+          </Router>
+        </CartProvider>
+      </SessionProvider>
+    );
+  }
 
 export default App;
