@@ -5,6 +5,7 @@ import './App.css';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Payment from './pages/Payment';
+import ProductPage from './pages/ProductPage';
 import { SessionProvider, SessionContext } from './middleware/SessionManager';
 
 // ----- CART CONTEXT AND PROVIDER -----
@@ -90,6 +91,7 @@ function Header() {
 function ProductCard({ product }) {
   const [quantity, setQuantity] = useState(1);
   const { addToCart } = useContext(CartContext);
+  const navigate = useNavigate();
 
   const handleIncrement = () => {
     if (quantity < product.stock) {
@@ -124,8 +126,16 @@ function ProductCard({ product }) {
     addToCart(product, quantity);
   };
 
+  const handleCardClick = (e) => {
+    // Only navigate if the click wasn't on an interactive element
+    if (!e.target.closest('.no-navigate')) {
+      navigate(`/product-page/${product.id}`);
+    }
+  };
+
+
   return (
-    <div className="product-card">
+    <div className="product-card" onClick={handleCardClick}>
       <div className="product-image-container">
         <img
           src={product.image_path}
@@ -139,7 +149,7 @@ function ProductCard({ product }) {
         <p className="product-category">Category: {product.category}</p>
         <p className="product-price">Price: ${product.price}</p>
         <p className="product-stock">Stock: {product.stock}</p>
-        <div className="quantity-selector">
+        <div className="quantity-selector no-navigate">
           <button
             onClick={handleDecrement}
             className={`quantity-btn ${quantity === 1 ? 'disabled' : ''}`}
@@ -162,7 +172,7 @@ function ProductCard({ product }) {
             +
           </button>
         </div>
-        <button onClick={handleAddToCart} className="add-to-cart-btn">Add to Cart</button>
+        <button onClick={handleAddToCart} className="add-to-cart-btn no-navigate">Add to Cart</button>
       </div>
     </div>
   );
@@ -394,6 +404,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/payment" element={<Payment />} />
+            <Route path="/product-page/:id" element={<ProductPage />} />
           </Routes>
         </Router>
       </CartProvider>
