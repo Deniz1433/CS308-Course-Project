@@ -98,10 +98,10 @@ function ProductPage() {
 
         <div className="product-image-container">
             <img
-            src={`http://localhost:5000/${product.image_path}`}
-            alt={product.name}
-            className="product-image scale-image"
-            />
+			  src={`/${product.image_path}`}
+			  alt={product.name}
+			  className="product-image scale-image"
+			/>
         </div>
         <div className="product-info">
             <h2 className="product-name">{product.name}</h2>
