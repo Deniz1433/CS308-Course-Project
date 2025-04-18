@@ -5,6 +5,7 @@ import './App.css';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Payment from './pages/Payment';
+import ProductPage from './pages/ProductPage';
 import { SessionProvider, SessionContext } from './middleware/SessionManager';
 import {
     Card,
@@ -101,8 +102,10 @@ function Header() {
 
 // ----- PRODUCT CARD COMPONENT -----
 function ProductCard({ product }) {
+  
     const [quantity, setQuantity] = useState(1);
     const { addToCart } = useContext(CartContext);
+    const navigate = useNavigate();
 
     const handleIncrement = () => {
         if (quantity < product.stock) {
@@ -136,9 +139,17 @@ function ProductCard({ product }) {
     const handleAddToCart = () => {
         addToCart(product, quantity);
     };
-
+    
+    const handleCardClick = (e) => {
+        // Only navigate if the click wasn't on an interactive element
+        if (!e.target.closest('.no-navigate')) {
+          navigate(`/product-page/${product.id}`);
+        }
+    };
+  
     return (
         <Card
+            onClick={handleCardClick}
             sx={{
                 display: "flex",
                 flexDirection: "column",
@@ -182,6 +193,7 @@ function ProductCard({ product }) {
                         mb: 1,
                         gap: 1,
                     }}
+                    className="no-navigate"
                 >
                     <IconButton
                         onClick={handleDecrement}
@@ -233,12 +245,14 @@ function ProductCard({ product }) {
                         },
                     }}
                     onClick={handleAddToCart}
+                    className="no-navigate"
                 >
                     Add to Cart
                 </Button>
             </CardContent>
         </Card>
     );
+
 }
 
 // ----- CART COMPONENT -----
@@ -499,6 +513,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/payment" element={<Payment />} />
+            <Route path="/product-page/:id" element={<ProductPage />} />
           </Routes>
         </Router>
       </CartProvider>
