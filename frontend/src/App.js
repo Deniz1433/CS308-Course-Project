@@ -287,21 +287,20 @@ function Cart() {
             }}
         >
             <Button
-                variant="contained"
-                startIcon={showCart ? <ExpandLess /> : <ExpandMore />}
-                onClick={() => setShowCart(prev => !prev)}
-                sx={{ mb: 1 }}
-            >
-
-                {showCart ? 'Hide Cart' : 'Show Cart'}
-            </Button>
+			  variant="contained"
+			  startIcon={showCart ? <ExpandMore /> : <ExpandLess />}
+			  onClick={() => setShowCart(prev => !prev)}
+			  sx={{ mb: 1 }}
+			>
+			  {showCart ? 'Hide Cart' : 'Show Cart'}
+			</Button>
 
             <Collapse in={showCart}>
                 <Box
 					  className="cart tall-rectangular-cart"
 					  sx={{
+						maxWidth: '21vw',                          // → never wider than 90% of viewport
 						width: { xs: '100%', sm: 400, md: 500 },   // → full‑width on mobile, 400px on small screens, 500px on medium+
-						maxWidth: '22vw',                          // → never wider than 90% of viewport
 						overflowY: 'auto',
 						overflowX: 'hidden',                       // → hide any horizontal overflow
 						p: 2,
