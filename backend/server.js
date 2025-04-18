@@ -275,6 +275,79 @@ app.get('/api/session', (req, res) => {
   }
 });
 
+/**
+ * GET /api/user/profile
+ * Returns the current user’s profile
+ */
+app.get('/api/user/profile', async (req, res) => {
+  // ensure logged in
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const userId = req.session.user.id;
+  try {
+    const [rows] = await pool.promise().query(
+      `SELECT id, name, email, home_address
+       FROM users
+       WHERE id = ?`,
+      [userId]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Error fetching profile:', err);
+    res.status(500).json({ error: 'Failed to load profile' });
+  }
+});
+
+/**
+ * PUT /api/user/profile
+ * Updates name, home_address—and password if provided
+ */
+app.put('/api/user/profile', async (req, res) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const userId = req.session.user.id;
+  const { name, home_address, password } = req.body;
+
+  if (!name) {
+    return res.status(400).json({ error: 'Name is required' });
+  }
+
+  try {
+    // Build update query dynamically
+    const fields = [];
+    const params = [];
+
+    fields.push('name = ?');
+    params.push(name);
+
+    // home_address can be null
+    fields.push('home_address = ?');
+    params.push(home_address || null);
+
+    if (password) {
+      const hashed = bcrypt.hashSync(password, 10);
+      fields.push('password = ?');
+      params.push(hashed);
+    }
+
+    // Append WHERE
+    params.push(userId);
+
+    const sql = `UPDATE users SET ${fields.join(', ')} WHERE id = ?`;
+    await pool.promise().query(sql, params);
+
+    res.json({ message: 'Profile updated successfully' });
+  } catch (err) {
+    console.error('Error updating profile:', err);
+    res.status(500).json({ error: 'Failed to save profile' });
+  }
+});
+
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });

@@ -1,35 +1,53 @@
 // src/App.js
-import ProtectedRoute from './middleware/ProtectedRoute'; 
-import Orders from './pages/Orders';
 import React, { useState, useEffect, useContext, createContext } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from 'react-router-dom';
-import './App.css';
+import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
+import ProtectedRoute from './middleware/ProtectedRoute';
+import { SessionProvider, SessionContext } from './middleware/SessionManager';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Payment from './pages/Payment';
 import ProductPage from './pages/ProductPage';
-import { SessionProvider, SessionContext } from './middleware/SessionManager';
-import {
-    Card,
-    CardMedia,
-    CardContent,
-    Typography,
-    IconButton,
-    Button,
-    TextField,
-    Box,
-    Collapse
-} from "@mui/material";
-import { Add, Remove } from "@mui/icons-material";
-import { ExpandLess, ExpandMore } from '@mui/icons-material';
+import Orders from './pages/Orders';
+import ProfilePage from './pages/Profile';
 
-// ----- CART CONTEXT AND PROVIDER -----
+import {
+  Header,
+  ProductCardItem,
+  CartDrawer,
+  MainContainer,
+  ProductGrid,
+  SearchInput,
+  SortButton,
+  CategoryButton,
+  VisualsProvider,
+} from './Visuals';
+
+import {
+  Box,
+  Divider,
+  List,
+  ListItem,
+  ListItemAvatar,
+  Avatar,
+  ListItemText,
+  Typography,
+  Button,
+  FormControl,
+  RadioGroup,
+  FormControlLabel,
+  Radio,
+  Grid,
+  IconButton
+} from '@mui/material';
+import DeleteIcon from '@mui/icons-material/Delete';
+
+// Cart context
 export const CartContext = createContext();
 
 export const CartProvider = ({ children }) => {
   const [cart, setCart] = useState(() => {
-    const storedCart = localStorage.getItem('cart');
-    return storedCart ? JSON.parse(storedCart) : [];
+    const stored = localStorage.getItem('cart');
+    return stored ? JSON.parse(stored) : [];
   });
 
   useEffect(() => {
@@ -37,37 +55,27 @@ export const CartProvider = ({ children }) => {
   }, [cart]);
 
   const addToCart = (product, quantity) => {
-    setCart(prevCart => {
-      const existingItem = prevCart.find(item => item.id === product.id);
-      if (existingItem) {
-        return prevCart.map(item =>
+    setCart(prev => {
+      const existing = prev.find(item => item.id === product.id);
+      if (existing) {
+        return prev.map(item =>
           item.id === product.id
             ? { ...item, quantity: item.quantity + quantity }
             : item
         );
       }
-      return [
-        ...prevCart,
-        {
-          id: product.id,
-          name: product.name,
-          price: product.price,
-          image_path: product.image_path,
-          quantity,
-          stock: product.stock,
-        },
-      ];
+      return [...prev, { ...product, quantity }];
     });
   };
 
-  const removeFromCart = (productId) => {
-    setCart(prevCart => prevCart.filter(item => item.id !== productId));
+  const removeFromCart = id => {
+    setCart(prev => prev.filter(item => item.id !== id));
   };
 
-  const updateCartQuantity = (productId, newQuantity) => {
-    setCart(prevCart =>
-      prevCart.map(item =>
-        item.id === productId ? { ...item, quantity: newQuantity } : item
+  const updateCartQuantity = (id, quantity) => {
+    setCart(prev =>
+      prev.map(item =>
+        item.id === id ? { ...item, quantity } : item
       )
     );
   };
@@ -79,441 +87,165 @@ export const CartProvider = ({ children }) => {
   );
 };
 
-// ----- HEADER COMPONENT -----
-function Header() {
-  const { user, logout } = useContext(SessionContext);
-
-  return (
-    <header className="App-header">
-    <div className="header-container">
-        <div className="user-controls">
-        {user ? (
-            <>
-            <span className="welcome-msg">Welcome, {user.name}!</span>
-            <Link to="/orders">
-                <button className="orders-btn">Orders</button>
-            </Link>
-            <button onClick={logout} className="logout-btn">Logout</button>
-            </>
-        ) : (
-            <Link to="/login">
-            <button className="login-btn">Login</button>
-            </Link>
-        )}
-        </div>
-        <h1>Product Listings</h1>
-    </div>
-    </header>
-  );
-}
-
-// ----- PRODUCT CARD COMPONENT -----
-function ProductCard({ product }) {
-  
-    const [quantity, setQuantity] = useState(1);
-    const { addToCart } = useContext(CartContext);
-    const navigate = useNavigate();
-
-    const handleIncrement = () => {
-        if (quantity < product.stock) {
-            setQuantity((q) => q + 1);
-        }
-    };
-
-    const handleDecrement = () => {
-        if (quantity > 1) {
-            setQuantity((q) => q - 1);
-        }
-    };
-
-    const handleManualChange = (e) => {
-        const value = e.target.value;
-        if (value === "") {
-            setQuantity("");
-            return;
-        }
-        if (!isNaN(value) && value >= 1 && value <= product.stock) {
-            setQuantity(Number(value));
-        }
-    };
-
-    const handleBlur = (e) => {
-        if (e.target.value === "") {
-            setQuantity(1);
-        }
-    };
-
-    const handleAddToCart = () => {
-        addToCart(product, quantity);
-    };
-    
-    const handleCardClick = (e) => {
-        // Only navigate if the click wasn't on an interactive element
-        if (!e.target.closest('.no-navigate')) {
-          navigate(`/product-page/${product.id}`);
-        }
-    };
-  
-    return (
-        <Card
-            onClick={handleCardClick}
-            sx={{
-                display: "flex",
-                flexDirection: "column",
-                maxWidth: 350,
-                backgroundColor: "#1e1e1e",
-                color: "#fff",
-                borderRadius: 3,
-                overflow: "hidden",
-                boxShadow: 6,
-            }}
-        >
-            <CardMedia
-                component="img"
-                height="200"
-                image={product.image_path}
-                alt={product.name}
-                sx={{ objectFit: "cover" }}
-            />
-            <CardContent sx={{ px: 3, pb: 2 }}>
-                <Typography variant="h6" gutterBottom>
-                    {product.name}
-                </Typography>
-                <Typography variant="body2" color="gray" gutterBottom>
-                    {product.description}
-                </Typography>
-                <Typography variant="body2" color="gray">
-                    Category: {product.category}
-                </Typography>
-                <Typography variant="body1" sx={{ mt: 1 }}>
-                    Price: ${product.price}
-                </Typography>
-                <Typography variant="body2" color="gray">
-                    Stock: {product.stock}
-                </Typography>
-
-                <Box
-                    sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        mt: 2,
-                        mb: 1,
-                        gap: 1,
-                    }}
-                    className="no-navigate"
-                >
-                    <IconButton
-                        onClick={handleDecrement}
-                        disabled={quantity === 1}
-                        sx={{ color: "white", border: "1px solid gray" }}
-                    >
-                        <Remove />
-                    </IconButton>
-                    <TextField
-                        value={quantity}
-                        onChange={handleManualChange}
-                        onBlur={handleBlur}
-                        inputProps={{
-                            style: {
-                                textAlign: "center",
-                                width: "40px",
-                                padding: "6px",
-                                color: "white",
-                            },
-                        }}
-                        sx={{
-                            "& .MuiInputBase-root": {
-                                backgroundColor: "#2b2b2b",
-                            },
-                            "& input": {
-                                textAlign: "center",
-                            },
-                            width: "60px",
-                        }}
-                    />
-                    <IconButton
-                        onClick={handleIncrement}
-                        disabled={quantity === product.stock}
-                        sx={{ color: "white", border: "1px solid gray" }}
-                    >
-                        <Add />
-                    </IconButton>
-                </Box>
-
-                <Button
-                    variant="contained"
-                    color="primary"
-                    fullWidth
-                    sx={{
-                        mt: 1,
-                        bgcolor: "#1976d2",
-                        "&:hover": {
-                            bgcolor: "#1565c0",
-                        },
-                    }}
-                    onClick={handleAddToCart}
-                    className="no-navigate"
-                >
-                    Add to Cart
-                </Button>
-            </CardContent>
-        </Card>
-    );
-
-}
-
-// ----- CART COMPONENT -----
-
-function Cart() {
-    const { cart, removeFromCart, updateCartQuantity } = useContext(CartContext);
-    const { user } = useContext(SessionContext);
-    const navigate = useNavigate();
-    const [showCart, setShowCart] = useState(true);
-
-    if (cart.length === 0) return null;
-
-    const total = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
-
-    return (
-        <Box
-            sx={{
-                position: 'fixed',
-                bottom: 16,
-                right: 16,
-                zIndex: 9999,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'flex-end',
-            }}
-        >
-            <Button
-			  variant="contained"
-			  startIcon={showCart ? <ExpandMore /> : <ExpandLess />}
-			  onClick={() => setShowCart(prev => !prev)}
-			  sx={{ mb: 1 }}
-			>
-			  {showCart ? 'Hide Cart' : 'Show Cart'}
-			</Button>
-
-            <Collapse in={showCart}>
-                <Box
-					  className="cart tall-rectangular-cart"
-					  sx={{
-						maxWidth: '21vw',                          // → never wider than 90% of viewport
-						width: { xs: '100%', sm: 400, md: 500 },   // → full‑width on mobile, 400px on small screens, 500px on medium+
-						overflowY: 'auto',
-						overflowX: 'hidden',                       // → hide any horizontal overflow
-						p: 2,
-						border: '1px solid #ccc',
-						borderRadius: 2,
-						backgroundColor: '#fff',
-						boxShadow: 3,
-					  }}
-					>
-
-                    <Typography variant="h5" gutterBottom>Your Cart</Typography>
-                    {cart.map(item => {
-                        const handleIncrement = () => {
-                            if (item.quantity < item.stock) {
-                                updateCartQuantity(item.id, item.quantity + 1);
-                            }
-                        };
-
-                        const handleDecrement = () => {
-                            if (item.quantity > 1) {
-                                updateCartQuantity(item.id, item.quantity - 1);
-                            }
-                        };
-
-                        const handleManualChange = (e) => {
-                            const value = e.target.value;
-                            if (value === "") {
-                                updateCartQuantity(item.id, "");
-                                return;
-                            }
-                            if (!isNaN(value) && value >= 1 && value <= item.stock) {
-                                updateCartQuantity(item.id, Number(value));
-                            }
-                        };
-
-                        const handleBlur = (e) => {
-                            if (e.target.value === "") {
-                                updateCartQuantity(item.id, 1);
-                            }
-                        };
-
-                        return (
-                            <Box key={item.id} sx={{ display: 'flex', gap: 2, mb: 2 }}>
-                                <img
-                                    src={item.image_path}
-                                    alt={item.name}
-                                    style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 8 }}
-                                />
-                                <Box>
-                                    <Typography>{item.name}</Typography>
-                                    <Typography variant="body2">Price: ${item.price}</Typography>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-                                        <Button variant="outlined" size="small" onClick={handleDecrement} disabled={item.quantity === 1}>–</Button>
-                                        <input
-                                            type="text"
-                                            value={item.quantity}
-                                            onChange={handleManualChange}
-                                            onBlur={handleBlur}
-                                            style={{
-                                                width: 40,
-                                                textAlign: 'center',
-                                                margin: '0 8px',
-                                                padding: '4px',
-                                                border: '1px solid #ccc',
-                                                borderRadius: 4
-                                            }}
-                                        />
-                                        <Button variant="outlined" size="small" onClick={handleIncrement} disabled={item.quantity === item.stock}>+</Button>
-                                        <Button
-                                            onClick={() => removeFromCart(item.id)}
-                                            variant="text"
-                                            color="error"
-                                            sx={{ ml: 2 }}
-                                        >
-                                            Remove
-                                        </Button>
-                                    </Box>
-                                </Box>
-                            </Box>
-                        );
-                    })}
-                    <Box sx={{ mt: 2 }}>
-                        <Typography variant="h6">Total: ${total.toFixed(2)}</Typography>
-                    </Box>
-                    <Button
-                        variant="contained"
-                        color="primary"
-                        sx={{ mt: 2 }}
-                        onClick={() => {
-                            if (!user) {
-                                navigate('/login', { state: { from: '/payment' } });
-                            } else {
-                                navigate('/payment');
-                            }
-                        }}
-                    >
-                        Proceed to Payment
-                    </Button>
-                </Box>
-            </Collapse>
-        </Box>
-    );
-}
-
-// ----- PRODUCT LISTING COMPONENT -----
 function ProductListing() {
+  const { cart, addToCart, removeFromCart, updateCartQuantity } = useContext(CartContext);
+  const { user, logout } = useContext(SessionContext);
+  const navigate = useNavigate();
+
   const [products, setProducts] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState(null);
   const [sortOption, setSortOption] = useState(null);
   const [sortOrder, setSortOrder] = useState('asc');
-  const [sortMenuVisible, setSortMenuVisible] = useState(false);
-  const [searchQuery, setSearchQuery] = useState(''); // New state for search query
+  const [sortVisible, setSortVisible] = useState(false);
+  const [quantityMap, setQuantityMap] = useState({});
+  const [cartOpen, setCartOpen] = useState(false);
 
   useEffect(() => {
-      fetch('/api/products')
-          .then(response => response.json())
-          .then(data => setProducts(data))
-          .catch(error => console.error('Error fetching data:', error));
+    fetch('/api/products')
+      .then(res => res.json())
+      .then(data => setProducts(data))
+      .catch(console.error);
   }, []);
 
   const categories = [...new Set(products.map(p => p.category))];
 
-  // Filter products by category and search query
-  const filteredProducts = products.filter(product => {
-      const matchesCategory = selectedCategory ? product.category === selectedCategory : true;
-      const matchesSearchQuery = product.name.toLowerCase().includes(searchQuery.toLowerCase())
-          || product.category.toLowerCase().includes(searchQuery.toLowerCase())
-          || product.description.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesCategory && matchesSearchQuery;
+  const handleQuantityChange = (id, val, stock) => {
+    const q = Number(val) || 1;
+    setQuantityMap(prev => ({
+      ...prev,
+      [id]: Math.max(1, Math.min(q, stock))
+    }));
+  };
+
+  const handleIncrement = (id, stock) => {
+    setQuantityMap(prev => ({
+      ...prev,
+      [id]: Math.min((prev[id] || 1) + 1, stock)
+    }));
+  };
+
+  const handleDecrement = id => {
+    setQuantityMap(prev => ({
+      ...prev,
+      [id]: Math.max((prev[id] || 1) - 1, 1)
+    }));
+  };
+
+  const filtered = products.filter(p => {
+    const q = search.toLowerCase();
+    return (!category || p.category === category) && (
+      p.name.toLowerCase().includes(q) ||
+      p.description.toLowerCase().includes(q) ||
+      p.category.toLowerCase().includes(q)
+    );
   });
 
-  const sortedProducts = [...filteredProducts].sort((a, b) => {
-      if (!sortOption) return 0;
-      const valueA = sortOption === 'price' ? a.price : a.popularity;
-      const valueB = sortOption === 'price' ? b.price : b.popularity;
-      return sortOrder === 'asc' ? valueA - valueB : valueB - valueA;
+  const sorted = [...filtered].sort((a, b) => {
+    if (!sortOption) return 0;
+    const valA = sortOption === 'price' ? Number(a.price) : a.popularity;
+    const valB = sortOption === 'price' ? Number(b.price) : b.popularity;
+    return sortOrder === 'asc' ? valA - valB : valB - valA;
   });
+
+  const total = cart.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
+
+  const handleProceed = () => {
+    setCartOpen(false);
+    if (!user) navigate('/login', { state: { from: '/payment' } });
+    else navigate('/payment');
+  };
 
   return (
-      <div className="App">
-          <Header />
+    <>
+      <Header
+        user={user}
+        onLogout={logout}
+        onOpenCart={() => setCartOpen(true)}
+        cartCount={cart.reduce((acc, i) => acc + i.quantity, 0)}
+      />
 
-          {/* SEARCH BAR */}
-          <div className="search-bar-container">
-              <input
-                  type="text"
-                  placeholder="Search by name, category, or description..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="search-bar"
+      <MainContainer>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+          <SearchInput
+            placeholder="Search..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          <SortButton onClick={() => setSortVisible(v => !v)}>Sort by</SortButton>
+          {sortVisible && (
+            <Box sx={{ display: 'flex', alignItems: 'center', ml: 2 }}>
+              <FormControl component="fieldset">
+                <RadioGroup row value={sortOption} onChange={e => setSortOption(e.target.value)}>
+                  <FormControlLabel value="price" control={<Radio />} label="Price" />
+                  <FormControlLabel value="popularity" control={<Radio />} label="Popularity" />
+                </RadioGroup>
+              </FormControl>
+              <SortButton onClick={() => setSortOrder('asc')}>Asc</SortButton>
+              <SortButton onClick={() => setSortOrder('desc')}>Desc</SortButton>
+            </Box>
+          )}
+        </Box>
+
+        <Box sx={{ mb: 2 }}>
+          <CategoryButton onClick={() => setCategory(null)}>All Products</CategoryButton>
+          {categories.map(cat => (
+            <CategoryButton key={cat} onClick={() => setCategory(cat)}>{cat}</CategoryButton>
+          ))}
+        </Box>
+
+        <ProductGrid container spacing={2}>
+          {sorted.map(product => (
+            <Grid item key={product.id} xs={12} sm={6} md={4} lg={3}>
+              <ProductCardItem
+                product={product}
+                quantity={quantityMap[product.id] || 1}
+                onIncrement={() => handleIncrement(product.id, product.stock)}
+                onDecrement={() => handleDecrement(product.id)}
+                onQuantityChange={val => handleQuantityChange(product.id, val, product.stock)}
+                onAdd={addToCart}
+                onView={id => navigate(`/product-page/${id}`)}
               />
-          </div>
+            </Grid>
+          ))}
+        </ProductGrid>
+      </MainContainer>
 
-          {/* SORT BUTTON */}
-          <div className="sort-container">
-              <button onClick={() => setSortMenuVisible(!sortMenuVisible)} className="sort-button">
-                  Sort
-              </button>
-              {sortMenuVisible && (
-                  <div className="sort-menu">
-                      <label>
-                          <input
-                              type="radio"
-                              name="sortOption"
-                              value="price"
-                              onChange={() => setSortOption('price')}
-                          />
-                          Price
-                      </label>
-                      <label>
-                          <input
-                              type="radio"
-                              name="sortOption"
-                              value="popularity"
-                              onChange={() => setSortOption('popularity')}
-                          />
-                          Popularity
-                      </label>
-                      <button onClick={() => setSortOrder('asc')} className="sort-order-btn">Ascending</button>
-                      <button onClick={() => setSortOrder('desc')} className="sort-order-btn">Descending</button>
-                  </div>
-              )}
-          </div>
-
-          {/* CATEGORY SELECTOR */}
-          <div className="category-selector">
-              <button onClick={() => setSelectedCategory(null)} className={!selectedCategory ? 'active' : ''}>
-                  All Products
-              </button>
-              {categories.map(category => (
-                  <button key={category} onClick={() => setSelectedCategory(category)} className={selectedCategory === category ? 'active' : ''}>
-                      {category}
-                  </button>
-              ))}
-          </div>
-
-          {/* PRODUCT LIST */}
-          <div className="product-list">
-              {sortedProducts.map(product => (
-                  <ProductCard key={product.id} product={product} />
-              ))}
-          </div>
-          {/* Render the cart in the bottom right */}
-          <Cart />
-      </div>
+      <CartDrawer anchor="right" open={cartOpen} onClose={() => setCartOpen(false)}>
+        <Typography variant="h5" gutterBottom>Your Cart</Typography>
+        <Divider />
+        <List>
+          {cart.map(item => (
+            <ListItem key={item.id} secondaryAction={
+              <IconButton edge="end" onClick={() => removeFromCart(item.id)}>
+                <DeleteIcon />
+              </IconButton>
+            }>
+              <ListItemAvatar>
+                <Avatar src={item.image_path} />
+              </ListItemAvatar>
+              <ListItemText
+                primary={item.name}
+                secondary={`$${Number(item.price).toFixed(2)} × ${item.quantity}`}
+              />
+            </ListItem>
+          ))}
+        </List>
+        <Box sx={{ p: 2 }}>
+          <Typography variant="h6">Total: ${total.toFixed(2)}</Typography>
+          <Button variant="contained" fullWidth onClick={handleProceed} sx={{ mt: 1 }}>
+            Proceed to Payment
+          </Button>
+        </Box>
+      </CartDrawer>
+    </>
   );
 }
 
-
-// ----- APP COMPONENT -----
 function App() {
-    return (
-        <SessionProvider>
+  return (
+    <VisualsProvider>
+      <SessionProvider>
         <CartProvider>
           <Router>
             <Routes>
@@ -522,19 +254,14 @@ function App() {
               <Route path="/register" element={<Register />} />
               <Route path="/payment" element={<Payment />} />
               <Route path="/product-page/:id" element={<ProductPage />} />
-              <Route
-                  path="/orders"
-                  element={
-                    <ProtectedRoute>
-                        <Orders />
-                    </ProtectedRoute>
-                  }
-            />
+              <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+              <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             </Routes>
           </Router>
         </CartProvider>
       </SessionProvider>
-    );
-  }
+    </VisualsProvider>
+  );
+}
 
 export default App;
