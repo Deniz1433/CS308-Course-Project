@@ -4,7 +4,10 @@
     "\\backend",
     "\\backend\\mysql-init",
     "\\frontend",
-    "\\frontend\\src"
+    "\\frontend\\src",
+    "\\frontend\\src\\middleware",
+    "\\frontend\\src\\pages"
   ],
+  "SelectedNode": "\\frontend\\Dockerfile",
   "PreviewInSolutionExplorer": false
 }
