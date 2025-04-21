@@ -5,6 +5,7 @@ import ProtectedRoute from './middleware/ProtectedRoute';
 import { SessionProvider, SessionContext } from './middleware/SessionManager';
 import Login from './pages/Login';
 import Register from './pages/Register';
+//import { RoleRoute } from './middleware/RoleRoute';
 import Payment from './pages/Payment';
 import ProductPage from './pages/ProductPage';
 import Orders from './pages/Orders';
@@ -88,7 +89,7 @@ export const CartProvider = ({ children }) => {
 };
 
 function ProductListing() {
-  const { cart, addToCart, removeFromCart, updateCartQuantity } = useContext(CartContext);
+  const { cart, addToCart, removeFromCart, updateCartQuantity} = useContext(CartContext);
   const { user, logout } = useContext(SessionContext);
   const navigate = useNavigate();
 
@@ -222,7 +223,7 @@ function ProductListing() {
               </IconButton>
             }>
               <ListItemAvatar>
-                <Avatar src={item.image_path} />
+                <Avatar src={item.image_path} />  
               </ListItemAvatar>
               <ListItemText
                 primary={item.name}
