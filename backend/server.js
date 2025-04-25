@@ -245,15 +245,16 @@ app.get('/api/orders', async (req, res) => {
 
 // ----- COMMENT AND RATING ROUTES -----
 
-// New: Get all comments (no approval filtering)
+// New: Get approved comments
 app.get('/api/comments/:productId', async (req, res) => {
   const { productId } = req.params;
   try {
     const [rows] = await pool.promise().query(
-      `SELECT c.comment_text, c.created_at, u.name
+      `SELECT c.id AS comment_id, c.user_id, c.comment_text, c.created_at, u.name
        FROM comments c
        JOIN users u ON c.user_id = u.id
        WHERE c.product_id = ?
+         AND c.approved = TRUE
        ORDER BY c.created_at DESC`,
       [productId]
     );
@@ -263,6 +264,78 @@ app.get('/api/comments/:productId', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch comments' });
   }
 });
+
+// Get the logged-in user's unapproved comment for a specific product
+app.get('/api/pending-comment/:productId', async (req, res) => {
+  if (!req.session.user?.id) return res.status(401).json({ error: 'Unauthorized' });
+
+  const { productId } = req.params;
+  const userId = req.session.user.id;
+
+  try {
+    const [rows] = await pool.promise().query(
+      `SELECT id AS comment_id, comment_text, created_at
+       FROM comments
+       WHERE product_id = ?
+         AND user_id = ?
+         AND approved = FALSE
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [productId, userId]
+    );
+
+    if (rows.length > 0) {
+      res.json(rows[0]);
+    } else {
+      res.json(null);
+    }
+  } catch (err) {
+    console.error('Error fetching pending comment:', err);
+    res.status(500).json({ error: 'Failed to fetch pending comment' });
+  }
+});
+
+// Delete a comment (approved or unapproved) by its ID, and delete the associated rating
+app.delete('/api/delete-comment/:commentId', async (req, res) => {
+  if (!req.session.user?.id) return res.status(401).json({ error: 'Unauthorized' });
+
+  const { commentId } = req.params;
+  const userId = req.session.user.id;
+
+  try {
+    // First find the comment to get product_id
+    const [commentRows] = await pool.promise().query(
+      `SELECT product_id FROM comments WHERE id = ? AND user_id = ?`,
+      [commentId, userId]
+    );
+
+    if (commentRows.length === 0) {
+      return res.status(404).json({ error: 'Comment not found or not authorized.' });
+    }
+
+    const productId = commentRows[0].product_id;
+
+    // Delete the comment
+    await pool.promise().query(
+      `DELETE FROM comments WHERE id = ? AND user_id = ?`,
+      [commentId, userId]
+    );
+
+    // Delete the rating for that product and user
+    await pool.promise().query(
+      `DELETE FROM ratings WHERE product_id = ? AND user_id = ?`,
+      [productId, userId]
+    );
+
+    res.json({ message: 'Comment and rating deleted successfully.' });
+  } catch (err) {
+    console.error('Error deleting comment and rating:', err);
+    res.status(500).json({ error: 'Failed to delete comment and rating.' });
+  }
+});
+
+
+
 
 // New: Get average rating
 app.get('/api/ratings/:productId', async (req, res) => {
@@ -311,22 +384,32 @@ app.post('/api/ratings', async (req, res) => {
   const { productId, rating } = req.body;
   const userId = req.session.user.id;
 
-  if (!productId || !rating) return res.status(400).json({ error: 'Product ID and rating are required.' });
+  if (!productId || !rating) return res.status(400).json({ error: 'Product ID and rating required.' });
 
   try {
+    // Check if user already rated
+    const [existing] = await pool.promise().query(
+      `SELECT * FROM ratings WHERE user_id = ? AND product_id = ?`,
+      [userId, productId]
+    );
+
+    if (existing.length > 0) {
+      return res.status(400).json({ error: 'You have already rated this product.' });
+    }
+
+    // Insert rating
     await pool.promise().query(
-      `INSERT INTO ratings (user_id, product_id, rating)
-       VALUES (?, ?, ?)
-       ON DUPLICATE KEY UPDATE rating = VALUES(rating)`,
+      `INSERT INTO ratings (user_id, product_id, rating) VALUES (?, ?, ?)`,
       [userId, productId, rating]
     );
 
-    res.json({ message: 'Rating saved successfully.' });
+    res.json({ message: 'Rating added successfully.' });
   } catch (err) {
     console.error('Rating error:', err);
-    res.status(500).json({ error: 'Failed to save rating.' });
+    res.status(500).json({ error: 'Failed to submit rating.' });
   }
 });
+
 
 // Post comment
 app.post('/api/comments', async (req, res) => {
@@ -346,18 +429,30 @@ app.post('/api/comments', async (req, res) => {
     if (ratingRows.length === 0) {
       return res.status(403).json({ error: 'You must rate before commenting.' });
     }
+	
+	const [pending] = await pool.promise().query(
+	  `SELECT * FROM comments WHERE user_id = ? AND product_id = ? AND approved = FALSE`,
+	  [userId, productId]
+	);
+
+	if (pending.length > 0) {
+	  return res.status(400).json({ error: 'You already have a pending comment for this product.' });
+	}
+
 
     await pool.promise().query(
-      `INSERT INTO comments (user_id, product_id, comment_text) VALUES (?, ?, ?)`,
+      `INSERT INTO comments (user_id, product_id, comment_text, approved, created_at)
+       VALUES (?, ?, ?, FALSE, NOW())`,
       [userId, productId, comment_text]
     );
 
-    res.json({ message: 'Comment added successfully.' });
+    res.json({ message: 'Comment submitted for review and will appear once approved.' });
   } catch (err) {
     console.error('Comment error:', err);
     res.status(500).json({ error: 'Failed to post comment.' });
   }
 });
+
 
 // Profile routes
 app.get('/api/user/profile', async (req, res) => {
