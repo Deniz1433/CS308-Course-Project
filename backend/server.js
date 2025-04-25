@@ -135,10 +135,31 @@ app.post("/api/login", async (req, res) => {
 });
 
 // Check session
-app.get('/api/session', (req, res) => {
-  if (req.session.user) res.json({ user: req.session.user });
-  else res.status(401).json({ error: 'Not logged in' });
+app.get('/api/session', async (req, res) => {
+  if (!req.session.user?.id) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const [rows] = await pool.promise().query(
+      `SELECT u.id, u.name, u.email, r.name AS role
+       FROM users u
+       LEFT JOIN roles r ON u.role_id = r.id
+       WHERE u.id = ?`,
+      [req.session.user.id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ user: rows[0] });
+  } catch (err) {
+    console.error('Session fetch error:', err);
+    res.status(500).json({ error: 'Failed to fetch user session.' });
+  }
 });
+
 
 // ----- ORDER ROUTES -----
 

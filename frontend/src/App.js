@@ -9,6 +9,8 @@ import Payment from './pages/Payment';
 import ProductPage from './pages/ProductPage';
 import Orders from './pages/Orders';
 import ProfilePage from './pages/Profile';
+import AdminInterface from './pages/AdminInterface'; // adjust path if needed
+
 
 // MUI & Theming Imports
 import { createTheme, ThemeProvider, styled } from '@mui/material/styles';
@@ -134,6 +136,11 @@ function Header({ user, onLogout, onOpenCart, cartCount }) {
               anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
               transformOrigin={{ vertical: 'top', horizontal: 'right' }}
             >
+			  {(user?.role === 'product_manager' || user?.role === 'sales_manager') && (
+			  <MenuItem onClick={() => { handleMenuClose(); window.location.href = '/admin'; }}>
+				Admin Interface
+			  </MenuItem>
+			  )}
               <MenuItem onClick={() => { handleMenuClose(); window.location.href = '/profile'; }}>
                 My Profile
               </MenuItem>
@@ -396,6 +403,7 @@ function App() {
               <Route path="/product-page/:id" element={<ProductPage />} />
               <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+			  <Route path="/admin" element={<AdminInterface />} />
             </Routes>
           </Router>
         </CartProvider>
