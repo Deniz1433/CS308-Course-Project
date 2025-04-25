@@ -155,3 +155,43 @@ VALUES
 ('Alice Customer', 'alice@example.com', '123 Elm Street', 'customer123'),
 ('Bob Manager', 'bob@example.com', '456 Oak Avenue', 'product123'),
 ('Charlie Sales', 'charlie@example.com', '789 Pine Road', 'sales123');
+
+
+UPDATE comments SET approved = TRUE WHERE approved IS NULL;
+
+
+-- Comments for Laptop Pro (product_id = 1)
+INSERT INTO comments (product_id, user_id, comment_text, approved)
+VALUES
+  (1, 1, 'This laptop is a beast! Handles all my dev tools with ease.', TRUE),
+  (1, 2, 'Really good build quality, but a bit heavy.', TRUE);
+
+-- Comments for Wireless Headphones (product_id = 2)
+INSERT INTO comments (product_id, user_id, comment_text, approved)
+VALUES
+  (2, 1, 'Fantastic noise cancellation. Great for flights.', TRUE),
+  (2, 3, 'Bass is solid and battery life is more than enough.', TRUE);
+
+-- Comments for Smartwatch X (product_id = 3)
+INSERT INTO comments (product_id, user_id, comment_text, approved)
+VALUES
+  (3, 2, 'Nice health tracking features, very accurate.', TRUE),
+  (3, 3, 'Love the sleek design and vibrant screen!', TRUE);
+
+-- Ratings for Laptop Pro (product_id = 1)
+INSERT INTO ratings (product_id, user_id, rating)
+VALUES
+  (1, 1, 5),  -- Alice
+  (1, 2, 4);  -- Bob
+
+-- Ratings for Wireless Headphones (product_id = 2)
+INSERT INTO ratings (product_id, user_id, rating)
+VALUES
+  (2, 1, 5),  -- Alice
+  (2, 3, 4);  -- Charlie
+
+-- Ratings for Smartwatch X (product_id = 3)
+INSERT INTO ratings (product_id, user_id, rating)
+VALUES
+  (3, 2, 5),  -- Bob
+  (3, 3, 5);  -- Charlie
