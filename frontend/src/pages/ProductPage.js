@@ -1,13 +1,59 @@
-// --- File: src/pages/ProductPage.js ---
-
+// src/pages/ProductPage.js
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { CartContext } from '../App';
-import Rating from '@mui/material/Rating';
+import { styled } from '@mui/material/styles';
 import Box from '@mui/material/Box';
+import Grid from '@mui/material/Grid';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import TextField from '@mui/material/TextField';
+import Divider from '@mui/material/Divider';
+import Rating from '@mui/material/Rating';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import AddIcon from '@mui/icons-material/Add';
+import RemoveIcon from '@mui/icons-material/Remove';
+import { CartContext } from '../App';
+
+const PageContainer = styled(Box)(({ theme }) => ({
+  padding: theme.spacing(4),
+  maxWidth: 1200,
+  margin: '0 auto',
+}));
+
+const BackContainer = styled(Box)(({ theme }) => ({
+  marginBottom: theme.spacing(2),
+}));
+
+const ImageContainer = styled(Box)(({ theme }) => ({
+  textAlign: 'center',
+  '& img': {
+    maxWidth: '100%',
+    borderRadius: theme.shape.borderRadius,
+  },
+}));
+
+const InfoContainer = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: theme.spacing(2),
+}));
+
+const QuantityContainer = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  alignItems: 'center',
+  gap: theme.spacing(1),
+}));
+
+const SectionContainer = styled(Box)(({ theme }) => ({
+  marginTop: theme.spacing(4),
+}));
 
 function ProductPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const { addToCart } = useContext(CartContext);
+
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -19,247 +65,164 @@ function ProductPage() {
   const [commentText, setCommentText] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const { addToCart } = useContext(CartContext);
-  const navigate = useNavigate();
-
-
-
-  const fetchProduct = async () => {
-    try {
-      const response = await fetch(`/api/products/${id}`);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const data = await response.json();
-      setProduct(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchComments = async () => {
-    try {
-      const res = await fetch(`/api/comments/${id}`);
-      if (res.ok) {
-        const data = await res.json();
-        setComments(data);
-      }
-    } catch (err) {
-      console.error("Failed to fetch comments", err);
-    }
-  };
-
-  const fetchRating = async () => {
-    try {
-      const res = await fetch(`/api/ratings/${id}`);
-      if (res.ok) {
-        const { average_rating } = await res.json();
-        setAvgRating(average_rating);
-      }
-    } catch (err) {
-      console.error("Failed to fetch rating", err);
-    }
-  };
-
-  const fetchCanReview = async () => {
-    try {
-      const res = await fetch(`/api/can-review/${id}`, { credentials: 'include' });
-      const data = await res.json();
-      setCanReview(data.canReview);
-    } catch (err) {
-      console.error('Failed to fetch review eligibility:', err);
-    }
-  };
-
   useEffect(() => {
-    fetchProduct();
-    fetchComments();
-    fetchRating();
-    fetchCanReview();
+    async function loadData() {
+      try {
+        const [prodRes, commRes, rateRes, canRes] = await Promise.all([
+          fetch(`/api/products/${id}`),
+          fetch(`/api/comments/${id}`),
+          fetch(`/api/ratings/${id}`),
+          fetch(`/api/can-review/${id}`, { credentials: 'include' }),
+        ]);
+        if (!prodRes.ok) throw new Error(`Failed to load product (${prodRes.status})`);
+        const prodData = await prodRes.json();
+        setProduct(prodData);
+
+        if (commRes.ok) setComments(await commRes.json());
+        if (rateRes.ok) {
+          const { average_rating } = await rateRes.json();
+          setAvgRating(average_rating);
+        }
+        if (canRes.ok) {
+          const { canReview } = await canRes.json();
+          setCanReview(canReview);
+        }
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
   }, [id]);
 
-  const handleIncrement = () => {
-    if (product && quantity < product.stock) {
-      setQuantity(q => q + 1);
-    }
-  };
-
-  const handleDecrement = () => {
-    if (quantity > 1) {
-      setQuantity(q => q - 1);
-    }
-  };
-
-  const handleManualChange = (e) => {
-    const value = e.target.value;
-    if (value === "") {
-      setQuantity("");
-      return;
-    }
-    if (product && !isNaN(value) && value >= 1 && value <= product.stock) {
-      setQuantity(Number(value));
-    }
-  };
-
-  const handleBlur = (e) => {
-    if (e.target.value === "") {
-      setQuantity(1);
-    }
-  };
-
-  const handleAddToCart = () => {
-    if (product) {
-      addToCart(product, quantity);
-    }
-  };
-
-  const handleGoBack = () => {
-    navigate('/');
-  };
+  const handleGoBack = () => navigate('/');
+  const handleIncrement = () => product && setQuantity(q => Math.min(q + 1, product.stock));
+  const handleDecrement = () => setQuantity(q => Math.max(q - 1, 1));
+  const handleAddToCart = () => product && addToCart(product, quantity);
 
   const handleSubmitReview = async () => {
+    setSubmitting(true);
     try {
-      setSubmitting(true);
-
-      // First submit rating
       if (userRating) {
         await fetch('/api/ratings', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
+          method: 'POST', credentials: 'include', headers: {'Content-Type':'application/json'},
           body: JSON.stringify({ productId: id, rating: userRating })
         });
       }
-
-      // Then submit comment only if comment is written
       if (userRating && commentText.trim()) {
         await fetch('/api/comments', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
+          method: 'POST', credentials: 'include', headers: {'Content-Type':'application/json'},
           body: JSON.stringify({ productId: id, comment_text: commentText })
         });
         setCommentText('');
       }
-
-      // After submission, refresh rating and comments
-      await Promise.all([
-        fetchComments(),
-        fetchRating(),
+      // Refresh
+      const [newComments, newRating] = await Promise.all([
+        fetch(`/api/comments/${id}`).then(r=>r.json()),
+        fetch(`/api/ratings/${id}`).then(r=>r.json())
       ]);
-
-      alert('Thank you for your review!');
+      setComments(newComments);
+      setAvgRating(newRating.average_rating);
     } catch (err) {
-      console.error('Failed to submit review:', err);
+      console.error(err);
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (loading) return <div className="loading">Loading...</div>;
-  if (error) return <div className="error">Error: {error}</div>;
-  if (!product) return <div className="not-found">Product not found</div>;
+  if (loading) return <Typography align="center">Loading...</Typography>;
+  if (error) return <Typography color="error" align="center">Error: {error}</Typography>;
+  if (!product) return <Typography align="center">Product not found</Typography>;
 
   return (
-    <div className='product-page'>
-      <div className="back-to-main-container">
-        <button onClick={handleGoBack} className="back-btn">
-          ← Back to Main Page
-        </button>
-      </div>
+    <PageContainer>
+      <BackContainer>
+        <Button startIcon={<ArrowBackIcon />} onClick={handleGoBack} variant="outlined">
+          Back to Products
+        </Button>
+      </BackContainer>
+      <Grid container spacing={4}>
+        <Grid item xs={12} md={6}>
+          <ImageContainer>
+            <img src={`/${product.image_path}`} alt={product.name} />
+          </ImageContainer>
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <InfoContainer>
+            <Typography variant="h4">{product.name}</Typography>
+            <Typography>{product.description}</Typography>
+            <Typography variant="subtitle1">Category: {product.category}</Typography>
+            <Typography variant="h6" color="primary">${product.price}</Typography>
+            <Typography>Stock: {product.stock}</Typography>
+            <QuantityContainer>
+              <IconButton onClick={handleDecrement} disabled={quantity === 1}><RemoveIcon /></IconButton>
+              <TextField
+                type="number"
+                value={quantity}
+                onChange={e => setQuantity(Math.max(1, Math.min(Number(e.target.value)||1, product.stock)))}
+                inputProps={{ min: 1, max: product.stock, style: { textAlign: 'center', width: 60 } }}
+                size="small"
+              />
+              <IconButton onClick={handleIncrement} disabled={quantity >= product.stock}><AddIcon /></IconButton>
+            </QuantityContainer>
+            <Button variant="contained" onClick={handleAddToCart}>Add to Cart</Button>
+          </InfoContainer>
+        </Grid>
+      </Grid>
 
-      <div className="product-image-container">
-        <img
-          src={`/${product.image_path}`}
-          alt={product.name}
-          className="product-image scale-image"
-        />
-      </div>
+      <SectionContainer>
+        <Typography variant="h5">Rating</Typography>
+        <Box display="flex" alignItems="center" mt={1}>
+          {avgRating !== null ? (
+            <>
+              <Rating value={Number(avgRating)} precision={0.5} readOnly sx={{ mr: 1 }} />
+              <Typography>{Number(avgRating).toFixed(1)}</Typography>
+            </>
+          ) : <Typography>No ratings yet.</Typography>}
+        </Box>
+      </SectionContainer>
 
-      <div className="product-info">
-        <h2 className="product-name">{product.name}</h2>
-        <p className="product-description">{product.description}</p>
-        <p className="product-category">Category: {product.category}</p>
-        <p className="product-price">Price: ${product.price}</p>
-        <p className="product-stock">Stock: {product.stock}</p>
-
-        <div className="quantity-selector no-navigate">
-          <button onClick={handleDecrement} className={`quantity-btn ${quantity === 1 ? 'disabled' : ''}`} disabled={quantity === 1}>–</button>
-          <input
-            type="text"
-            value={quantity}
-            onChange={handleManualChange}
-            onBlur={handleBlur}
-            className="quantity-input"
-          />
-          <button onClick={handleIncrement} className={`quantity-btn ${quantity === product.stock ? 'disabled' : ''}`} disabled={quantity === product.stock}>+</button>
-        </div>
-
-        <button onClick={handleAddToCart} className="add-to-cart-btn">Add to Cart</button>
-      </div>
-
-      <div className="product-rating">
-        <h3>Rating</h3>
-        {avgRating !== null ? (
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Rating
-              name="read-only"
-              value={Number(avgRating)}
-              precision={0.5}
-              readOnly
-              sx={{ color: '#e67300', fontSize: '1.8rem' }}
-            />
-            <Box sx={{ ml: 1, fontSize: '1.2rem', color: '#555' }}>{Number(avgRating).toFixed(1)}</Box>
-          </Box>
-        ) : (
-          <p>No ratings yet.</p>
-        )}
-      </div>
-
-      <div className="product-comments">
-        <h3>Comments</h3>
+      <SectionContainer>
+        <Typography variant="h5">Comments</Typography>
         {comments.length === 0 ? (
-          <p>No comments yet.</p>
+          <Typography>No comments yet.</Typography>
         ) : (
-          <ul>
-            {comments.map((c, i) => (
-              <li key={i} className="comment-item">
-                <strong>{c.name}</strong> ({new Date(c.created_at).toLocaleDateString()}):<br />
-                {c.comment_text}
+          <Box component="ul" sx={{ pl: 2, mt: 1 }}>
+            {comments.map((c,i) => (
+              <li key={i}>
+                <Typography variant="subtitle2">{c.name} <Typography component="span" variant="body2" color="text.secondary">({new Date(c.created_at).toLocaleDateString()})</Typography></Typography>
+                <Typography variant="body1">{c.comment_text}</Typography>
+                <Divider sx={{ my: 1 }} />
               </li>
             ))}
-          </ul>
-        )}
-      </div>
-
-      {/* New Section: Review Form */}
-      {canReview && (
-        <div className="review-form">
-          <h3>Write Your Review</h3>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-            <Rating
-              name="user-rating"
-              value={userRating}
-              onChange={(e, newValue) => setUserRating(newValue)}
-            />
           </Box>
-          <textarea
+        )}
+      </SectionContainer>
+
+      {canReview && (
+        <SectionContainer>
+          <Typography variant="h5">Write Your Review</Typography>
+          <Box display="flex" alignItems="center" mt={1} mb={2}>
+            <Rating value={userRating} onChange={(e,newVal)=>setUserRating(newVal)} />
+          </Box>
+          <TextField
+            multiline
+            minRows={3}
+            fullWidth
+            variant="outlined"
             value={commentText}
-            onChange={(e) => setCommentText(e.target.value)}
+            onChange={e=>setCommentText(e.target.value)}
             placeholder="Write your comment (optional)"
-            rows={4}
-            style={{ width: '100%', marginBottom: '10px' }}
           />
-          <button
-            onClick={handleSubmitReview}
-            disabled={submitting || !userRating}
-            className="submit-review-btn"
-          >
-            {submitting ? "Submitting..." : "Submit Review"}
-          </button>
-        </div>
+          <Box mt={2}>
+            <Button variant="contained" onClick={handleSubmitReview} disabled={submitting || !userRating}>
+              {submitting ? 'Submitting...' : 'Submit Review'}
+            </Button>
+          </Box>
+        </SectionContainer>
       )}
-    </div>
+    </PageContainer>
   );
 }
 
