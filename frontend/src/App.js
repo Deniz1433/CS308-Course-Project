@@ -1,14 +1,15 @@
-// src/App.js
-import React, { useState, useEffect, useContext, createContext } from 'react';
+import React, { useContext, createContext, useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import ProtectedRoute from './middleware/ProtectedRoute';
 import { SessionProvider, SessionContext } from './middleware/SessionManager';
+
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Payment from './pages/Payment';
 import ProductPage from './pages/ProductPage';
 import Orders from './pages/Orders';
 import ProfilePage from './pages/Profile';
+import InvoicePage from './pages/InvoicePage';
 
 import {
   Header,
@@ -41,13 +42,13 @@ import {
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 
-// Cart context
+// ——— Cart context ———
 export const CartContext = createContext();
 
 export const CartProvider = ({ children }) => {
   const [cart, setCart] = useState(() => {
-    const stored = localStorage.getItem('cart');
-    return stored ? JSON.parse(stored) : [];
+    const s = localStorage.getItem('cart');
+    return s ? JSON.parse(s) : [];
   });
 
   useEffect(() => {
@@ -56,12 +57,12 @@ export const CartProvider = ({ children }) => {
 
   const addToCart = (product, quantity) => {
     setCart(prev => {
-      const existing = prev.find(item => item.id === product.id);
-      if (existing) {
-        return prev.map(item =>
-          item.id === product.id
-            ? { ...item, quantity: item.quantity + quantity }
-            : item
+      const ex = prev.find(i => i.id === product.id);
+      if (ex) {
+        return prev.map(i =>
+          i.id === product.id
+            ? { ...i, quantity: i.quantity + quantity }
+            : i
         );
       }
       return [...prev, { ...product, quantity }];
@@ -69,14 +70,12 @@ export const CartProvider = ({ children }) => {
   };
 
   const removeFromCart = id => {
-    setCart(prev => prev.filter(item => item.id !== id));
+    setCart(prev => prev.filter(i => i.id !== id));
   };
 
   const updateCartQuantity = (id, quantity) => {
     setCart(prev =>
-      prev.map(item =>
-        item.id === id ? { ...item, quantity } : item
-      )
+      prev.map(i => (i.id === id ? { ...i, quantity } : i))
     );
   };
 
@@ -87,6 +86,7 @@ export const CartProvider = ({ children }) => {
   );
 };
 
+// ——— Product listing ———
 function ProductListing() {
   const { cart, addToCart, removeFromCart, updateCartQuantity } = useContext(CartContext);
   const { user, logout } = useContext(SessionContext);
@@ -102,9 +102,9 @@ function ProductListing() {
   const [cartOpen, setCartOpen] = useState(false);
 
   useEffect(() => {
-    fetch('/api/products')
-      .then(res => res.json())
-      .then(data => setProducts(data))
+    fetch('/api/products', { credentials: 'include' })
+      .then(r => r.json())
+      .then(setProducts)
       .catch(console.error);
   }, []);
 
@@ -118,37 +118,36 @@ function ProductListing() {
     }));
   };
 
-  const handleIncrement = (id, stock) => {
+  const handleIncrement = (id, stock) =>
     setQuantityMap(prev => ({
       ...prev,
       [id]: Math.min((prev[id] || 1) + 1, stock)
     }));
-  };
 
-  const handleDecrement = id => {
+  const handleDecrement = id =>
     setQuantityMap(prev => ({
       ...prev,
       [id]: Math.max((prev[id] || 1) - 1, 1)
     }));
-  };
 
   const filtered = products.filter(p => {
     const q = search.toLowerCase();
-    return (!category || p.category === category) && (
-      p.name.toLowerCase().includes(q) ||
-      p.description.toLowerCase().includes(q) ||
-      p.category.toLowerCase().includes(q)
+    return (
+      (!category || p.category === category) &&
+      (p.name.toLowerCase().includes(q) ||
+        p.description.toLowerCase().includes(q) ||
+        p.category.toLowerCase().includes(q))
     );
   });
 
   const sorted = [...filtered].sort((a, b) => {
     if (!sortOption) return 0;
-    const valA = sortOption === 'price' ? Number(a.price) : a.popularity;
-    const valB = sortOption === 'price' ? Number(b.price) : b.popularity;
-    return sortOrder === 'asc' ? valA - valB : valB - valA;
+    const va = sortOption === 'price' ? Number(a.price) : a.popularity;
+    const vb = sortOption === 'price' ? Number(b.price) : b.popularity;
+    return sortOrder === 'asc' ? va - vb : vb - va;
   });
 
-  const total = cart.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
+  const total = cart.reduce((sum, i) => sum + Number(i.price) * i.quantity, 0);
 
   const handleProceed = () => {
     setCartOpen(false);
@@ -162,7 +161,7 @@ function ProductListing() {
         user={user}
         onLogout={logout}
         onOpenCart={() => setCartOpen(true)}
-        cartCount={cart.reduce((acc, i) => acc + i.quantity, 0)}
+        cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
       />
 
       <MainContainer>
@@ -176,9 +175,21 @@ function ProductListing() {
           {sortVisible && (
             <Box sx={{ display: 'flex', alignItems: 'center', ml: 2 }}>
               <FormControl component="fieldset">
-                <RadioGroup row value={sortOption} onChange={e => setSortOption(e.target.value)}>
-                  <FormControlLabel value="price" control={<Radio />} label="Price" />
-                  <FormControlLabel value="popularity" control={<Radio />} label="Popularity" />
+                <RadioGroup
+                  row
+                  value={sortOption}
+                  onChange={e => setSortOption(e.target.value)}
+                >
+                  <FormControlLabel
+                    value="price"
+                    control={<Radio />}
+                    label="Price"
+                  />
+                  <FormControlLabel
+                    value="popularity"
+                    control={<Radio />}
+                    label="Popularity"
+                  />
                 </RadioGroup>
               </FormControl>
               <SortButton onClick={() => setSortOrder('asc')}>Asc</SortButton>
@@ -188,39 +199,52 @@ function ProductListing() {
         </Box>
 
         <Box sx={{ mb: 2 }}>
-          <CategoryButton onClick={() => setCategory(null)}>All Products</CategoryButton>
+          <CategoryButton onClick={() => setCategory(null)}>
+            All Products
+          </CategoryButton>
           {categories.map(cat => (
-            <CategoryButton key={cat} onClick={() => setCategory(cat)}>{cat}</CategoryButton>
+            <CategoryButton key={cat} onClick={() => setCategory(cat)}>
+              {cat}
+            </CategoryButton>
           ))}
         </Box>
 
         <ProductGrid container spacing={2}>
-          {sorted.map(product => (
-            <Grid item key={product.id} xs={12} sm={6} md={4} lg={3}>
+          {sorted.map(p => (
+            <Grid item key={p.id} xs={12} sm={6} md={4} lg={3}>
               <ProductCardItem
-                product={product}
-                quantity={quantityMap[product.id] || 1}
-                onIncrement={() => handleIncrement(product.id, product.stock)}
-                onDecrement={() => handleDecrement(product.id)}
-                onQuantityChange={val => handleQuantityChange(product.id, val, product.stock)}
+                product={p}
+                quantity={quantityMap[p.id] || 1}
+                onIncrement={() => handleIncrement(p.id, p.stock)}
+                onDecrement={() => handleDecrement(p.id)}
+                onQuantityChange={val => handleQuantityChange(p.id, val, p.stock)}
                 onAdd={addToCart}
-                onView={id => navigate(`/product-page/${id}`)}
+                onView={() => navigate(`/product-page/${p.id}`)}
               />
             </Grid>
           ))}
         </ProductGrid>
       </MainContainer>
 
-      <CartDrawer anchor="right" open={cartOpen} onClose={() => setCartOpen(false)}>
-        <Typography variant="h5" gutterBottom>Your Cart</Typography>
+      <CartDrawer
+        anchor="right"
+        open={cartOpen}
+        onClose={() => setCartOpen(false)}
+      >
+        <Typography variant="h5" gutterBottom>
+          Your Cart
+        </Typography>
         <Divider />
         <List>
           {cart.map(item => (
-            <ListItem key={item.id} secondaryAction={
-              <IconButton edge="end" onClick={() => removeFromCart(item.id)}>
-                <DeleteIcon />
-              </IconButton>
-            }>
+            <ListItem
+              key={item.id}
+              secondaryAction={
+                <IconButton onClick={() => removeFromCart(item.id)}>
+                  <DeleteIcon />
+                </IconButton>
+              }
+            >
               <ListItemAvatar>
                 <Avatar src={item.image_path} />
               </ListItemAvatar>
@@ -233,7 +257,12 @@ function ProductListing() {
         </List>
         <Box sx={{ p: 2 }}>
           <Typography variant="h6">Total: ${total.toFixed(2)}</Typography>
-          <Button variant="contained" fullWidth onClick={handleProceed} sx={{ mt: 1 }}>
+          <Button
+            variant="contained"
+            fullWidth
+            onClick={handleProceed}
+            sx={{ mt: 1 }}
+          >
             Proceed to Payment
           </Button>
         </Box>
@@ -242,6 +271,7 @@ function ProductListing() {
   );
 }
 
+// ——— App wrapper ———
 function App() {
   return (
     <VisualsProvider>
@@ -253,9 +283,36 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/payment" element={<Payment />} />
-              <Route path="/product-page/:id" element={<ProductPage />} />
-              <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
-              <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+              <Route
+                path="/product-page/:id"
+                element={<ProductPage />}
+              />
+              <Route
+                path="/orders"
+                element={
+                  <ProtectedRoute>
+                    <Orders />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedRoute>
+                    <ProfilePage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Invoice route */}
+              <Route
+                path="/invoice/:orderId"
+                element={
+                  <ProtectedRoute>
+                    <InvoicePage />
+                  </ProtectedRoute>
+                }
+              />
             </Routes>
           </Router>
         </CartProvider>

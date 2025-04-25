@@ -1,7 +1,8 @@
+// src/pages/Payment.js
 import React, { useState, useContext, useEffect } from 'react';
-import { CartContext } from '../App'; // Adjust path if needed
-import { SessionContext } from '../middleware/SessionManager';
 import { useNavigate } from 'react-router-dom';
+import { CartContext } from '../App';
+import { SessionContext } from '../middleware/SessionManager';
 import {
   Container,
   Typography,
@@ -9,92 +10,68 @@ import {
   Button,
   Box,
   Alert,
-  Paper
+  Paper,
+  CircularProgress
 } from '@mui/material';
 
-const Payment = () => {
+export default function Payment() {
   const { cart, clearCart } = useContext(CartContext);
-  const total = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
   const { user } = useContext(SessionContext);
   const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!user) {
-      navigate('/login', { state: { from: '/payment' } });
-    }
-  }, [user, navigate]);
 
   const [cardNumber, setCardNumber] = useState('');
   const [expiry, setExpiry] = useState('');
   const [cvv, setCvv] = useState('');
   const [message, setMessage] = useState('');
-  const [alertSeverity, setAlertSeverity] = useState('success');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
+  useEffect(() => {
+    if (!user) {
+      navigate('/login', { replace: true, state: { from: '/payment' } });
+    }
+  }, [user, navigate]);
+
+  const handleSubmit = async e => {
     e.preventDefault();
+    setMessage('');
+    setLoading(true);
 
-    // Simple validation
-    if (!/^\d{16}$/.test(cardNumber)) {
-      setAlertSeverity('error');
-      setMessage('Card number must be 16 digits.');
+    // Basic front-end validation
+    if (!cardNumber || !expiry || !cvv) {
+      setMessage('Please fill in all payment fields.');
+      setLoading(false);
       return;
     }
-
-    if (!/^\d{2}\/\d{2}$/.test(expiry)) {
-      setAlertSeverity('error');
-      setMessage('Expiry must be in MM/YY format.');
-      return;
-    }
-
-    const [mm, yy] = expiry.split('/').map(Number);
-    const expiryDate = new Date(`20${yy}`, mm);
-    const now = new Date();
-    if (expiryDate <= now) {
-      setAlertSeverity('error');
-      setMessage('Card has expired.');
-      return;
-    }
-
-    if (!/^\d{3,4}$/.test(cvv)) {
-      setAlertSeverity('error');
-      setMessage('CVV must be 3 or 4 digits.');
-      return;
-    }
-
-    const data = {
-      cardNumber,
-      expiry,
-      cvv,
-      amount: total,
-      userId: user?.id,
-      cart: cart.map(item => ({
-        productId: item.id,
-        quantity: item.quantity
-      }))
-    };
 
     try {
-      const response = await fetch('/api/payment', {
+      // 1) send payment + create order on server
+      const resp = await fetch('/api/payment', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
+        body: JSON.stringify({ cardNumber, expiry, cvv, cart })
       });
-      const result = await response.json();
+      const data = await resp.json();
 
-      if (response.ok && result.message === 'Order placed successfully') {
-        setAlertSeverity('success');
-        setMessage('Payment successful! Redirecting...');
-        clearCart?.(); // Optional: only if you have a clearCart method
-        setTimeout(() => {
-          navigate('/');
-        }, 2000);
-      } else {
-        setAlertSeverity('error');
-        setMessage(result.message || 'Payment failed.');
+      if (!resp.ok) {
+        setMessage(data.error || data.message || 'Failed to place order');
+        setLoading(false);
+        return;
       }
-    } catch (error) {
-      setAlertSeverity('error');
-      setMessage('Payment failed. Please try again.');
+
+      const { orderId } = data;
+
+      // 2) Invoice email is sent automatically by the server
+
+      // 3) Clear cart and navigate to the invoice page
+      clearCart?.();
+      navigate(`/invoice/${orderId}`);
+
+    } catch (err) {
+      console.error(err);
+      setMessage('An unexpected error occurred.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -105,76 +82,75 @@ const Payment = () => {
         sx={{
           p: 4,
           backgroundColor: '#1e1e1e',
-          color: '#ffffff',
-          borderRadius: 2,
+          color: '#fff',
+          borderRadius: 2
         }}
       >
-        <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: '#d17b00' }}>
+        <Typography variant="h4" gutterBottom sx={{ color: '#d17b00' }}>
           Payment
         </Typography>
 
-        <Typography variant="subtitle1" gutterBottom>
-          Total Amount: ${total.toFixed(2)}
-        </Typography>
+        {message && (
+          <Alert severity="error" sx={{ mb: 2, backgroundColor: '#2e1f1f' }}>
+            {message}
+          </Alert>
+        )}
 
-        <Box component="form" onSubmit={handleSubmit} noValidate>
+        <Box
+          component="form"
+          onSubmit={handleSubmit}
+          noValidate
+          sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+        >
           <TextField
             label="Card Number"
             variant="filled"
-            fullWidth
-            required
-            margin="normal"
             value={cardNumber}
-            onChange={(e) => setCardNumber(e.target.value)}
-            InputProps={{ sx: { backgroundColor: '#2c2c2c', color: '#fff' } }}
+            onChange={e => setCardNumber(e.target.value)}
+            InputProps={{ sx: { color: '#fff' } }}
             InputLabelProps={{ sx: { color: '#aaa' } }}
+            sx={{ backgroundColor: '#2a2a2a', borderRadius: 1 }}
+            inputProps={{ maxLength: 16 }}
           />
+
           <TextField
-            label="Expiry Date (MM/YY)"
+            label="Expiry (MM/YY)"
             variant="filled"
-            fullWidth
-            required
-            margin="normal"
             value={expiry}
-            onChange={(e) => setExpiry(e.target.value)}
-            InputProps={{ sx: { backgroundColor: '#2c2c2c', color: '#fff' } }}
+            onChange={e => setExpiry(e.target.value)}
+            InputProps={{ sx: { color: '#fff' } }}
             InputLabelProps={{ sx: { color: '#aaa' } }}
+            sx={{ backgroundColor: '#2a2a2a', borderRadius: 1 }}
+            placeholder="04/26"
           />
+
           <TextField
             label="CVV"
             variant="filled"
-            fullWidth
-            required
-            margin="normal"
+            type="password"
             value={cvv}
-            onChange={(e) => setCvv(e.target.value)}
-            InputProps={{ sx: { backgroundColor: '#2c2c2c', color: '#fff' } }}
+            onChange={e => setCvv(e.target.value)}
+            InputProps={{ sx: { color: '#fff' } }}
             InputLabelProps={{ sx: { color: '#aaa' } }}
+            sx={{ backgroundColor: '#2a2a2a', borderRadius: 1 }}
+            inputProps={{ maxLength: 4 }}
           />
+
           <Button
             type="submit"
             variant="contained"
             fullWidth
             sx={{
               mt: 2,
-              backgroundColor: '#ff9800',
-              '&:hover': {
-                backgroundColor: '#e68900',
-              }
+              backgroundColor: '#d17b00',
+              '&:hover': { backgroundColor: '#bf6900' }
             }}
+            disabled={loading}
           >
-            Pay
+            {loading ? <CircularProgress size={24} sx={{ color: '#fff' }} /> : 'Pay & Email Invoice'}
           </Button>
         </Box>
-
-        {message && (
-          <Alert severity={alertSeverity} sx={{ mt: 3 }}>
-            {message}
-          </Alert>
-        )}
       </Paper>
     </Container>
   );
-};
-
-export default Payment;
+}
