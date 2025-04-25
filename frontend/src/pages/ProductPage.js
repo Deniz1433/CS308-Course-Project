@@ -151,12 +151,12 @@ function ProductPage() {
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <Rating
               name="read-only"
-              value={avgRating}
+              value={Number(avgRating)}
               precision={0.5}
               readOnly
               sx={{ color: '#e67300', fontSize: '1.8rem' }}
             />
-            <Box sx={{ ml: 1, fontSize: '1.2rem', color: '#555' }}>{avgRating.toFixed(1)}</Box>
+            <Box sx={{ ml: 1, fontSize: '1.2rem', color: '#555' }}>{Number(avgRating).toFixed(1)}</Box>
           </Box>
         ) : (
           <p>No ratings yet.</p>
