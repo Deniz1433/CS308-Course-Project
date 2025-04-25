@@ -138,6 +138,10 @@ ADD COLUMN price_approved BOOLEAN DEFAULT FALSE;
 ALTER TABLE comments
 ADD COLUMN approved BOOLEAN DEFAULT FALSE;
 
+-- Link users and their roles
+ALTER TABLE users ADD COLUMN role_id INT DEFAULT NULL, ADD FOREIGN KEY (role_id) REFERENCES roles(id);
+
+
 INSERT INTO roles (name) VALUES 
 ('customer'),
 ('product_manager'),
