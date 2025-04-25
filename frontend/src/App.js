@@ -103,11 +103,23 @@ function ProductListing() {
   const [cartOpen, setCartOpen] = useState(false);
 
   useEffect(() => {
-    fetch('/api/products')
-      .then(res => res.json())
-      .then(data => setProducts(data))
-      .catch(console.error);
+    async function fetchWithExtras() {
+      const res = await fetch('/api/products');
+      const data = await res.json();
+  
+      const enriched = await Promise.all(data.map(async (product) => {
+        const [{ count: commentCount }] = await (await fetch(`/api/comments/count/${product.id}`)).json().then(r => [r]).catch(() => [{ count: 0 }]);
+        const { average_rating: averageRating = 0, total_ratings: totalRatings = 0 } = await (await fetch(`/api/ratings/${product.id}`)).json().catch(() => ({}));
+        return { ...product, commentCount, averageRating, totalRatings };
+      }));
+      
+  
+      setProducts(enriched);
+    }
+  
+    fetchWithExtras();
   }, []);
+  
 
   const categories = [...new Set(products.map(p => p.category))];
 
@@ -200,6 +212,9 @@ function ProductListing() {
             <Grid item key={product.id} xs={12} sm={6} md={4} lg={3}>
               <ProductCardItem
                 product={product}
+                commentCount={product.commentCount}
+                averageRating={product.averageRating}
+                totalRatings={product.totalRatings}
                 quantity={quantityMap[product.id] || 1}
                 onIncrement={() => handleIncrement(product.id, product.stock)}
                 onDecrement={() => handleDecrement(product.id)}

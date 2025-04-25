@@ -378,6 +378,63 @@ app.put('/api/user/profile', async (req, res) => {
   }
 });
 
+
+// Get number of comments for a product (for main page)
+app.get('/api/comments/count/:productId', async (req, res) => {
+  const { productId } = req.params;
+  try {
+    const [rows] = await pool.promise().query(
+      `SELECT COUNT(*) AS count FROM comments WHERE product_id = ? AND approved IS NOT FALSE`,
+      [productId]
+    );
+    res.json(rows[0]); // returns: { count: X }
+  } catch (err) {
+    console.error('Error fetching comment count:', err);
+    res.status(500).json({ error: 'Failed to fetch comment count' });
+  }
+});
+
+// Get all comments for a product (for product page)
+app.get('/api/comments/:productId', async (req, res) => {
+  const { productId } = req.params;
+  try {
+    const [rows] = await pool.promise().query(
+      `SELECT c.comment_text, c.created_at, u.name FROM comments c
+       JOIN users u ON c.user_id = u.id
+       WHERE c.product_id = ? AND c.approved IS NOT FALSE
+       ORDER BY c.created_at DESC`,
+      [productId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching comments:', err);
+    res.status(500).json({ error: 'Failed to fetch comments' });
+  }
+});
+
+
+// Get average rating for a product (for main page & product page)
+app.get('/api/ratings/:productId', async (req, res) => {
+  const { productId } = req.params;
+  try {
+    const [rows] = await pool.promise().query(
+      `SELECT 
+         ROUND(AVG(rating),1) AS average_rating,
+         COUNT(*) AS total_ratings
+       FROM ratings
+       WHERE product_id = ?`,
+      [productId]
+    );
+    res.json(rows[0]); // { average_rating: 4.5, total_ratings: 3 }
+  } catch (err) {
+    console.error('Error fetching ratings:', err);
+    res.status(500).json({ error: 'Failed to fetch ratings' });
+  }
+});
+
+
+
+
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
