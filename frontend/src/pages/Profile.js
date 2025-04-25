@@ -1,9 +1,7 @@
 // src/pages/Profile.js
 import React, { useState, useEffect, useContext } from 'react';
+import { createTheme, ThemeProvider, styled } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
-import {
-  MainContainer,
-} from '../Visuals';
 import {
   Box,
   Typography,
@@ -16,6 +14,11 @@ import {
   Alert
 } from '@mui/material';
 import { SessionContext } from '../middleware/SessionManager';
+
+const MainContainer = styled(Box)(({ theme }) => ({
+  padding: theme.spacing(2),
+  backgroundColor: theme.palette.background.default,
+}));
 
 export default function ProfilePage() {
   const { user } = useContext(SessionContext);
