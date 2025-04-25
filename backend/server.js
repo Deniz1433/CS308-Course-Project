@@ -71,10 +71,22 @@ app.post("/api/register", async (req, res) => {
       return res.status(400).json({ error: "Email is already registered" });
     }
     const hashedPassword = bcrypt.hashSync(password, 10);
-    await pool.promise().query(
+    const [result] = await pool.promise().query(
       "INSERT INTO users (name, email, home_address, password) VALUES (?, ?, ?, ?)",
       [name, email, home_address, hashedPassword]
     );
+    
+    const userId = result.insertId;
+    
+    // Assign default 'customer' role
+    const [[{ id: customerRoleId }]] = await pool.promise().query(
+      "SELECT id FROM roles WHERE name = 'customer'"
+    );
+    await pool.promise().query(
+      "INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)",
+      [userId, customerRoleId]
+    );
+
     res.status(201).json({ message: "User registered successfully" });
   } catch (error) {
     console.error("Registration error:", error);
@@ -88,16 +100,34 @@ app.post("/api/login", async (req, res) => {
   if (!email || !password) {
     return res.status(400).json({ error: "All fields are required" });
   }
+
   try {
-    const [user] = await pool.promise().query("SELECT * FROM users WHERE email = ?", [email]);
-    if (user.length === 0) {
+    const [users] = await pool.promise().query("SELECT * FROM users WHERE email = ?", [email]);
+    if (users.length === 0) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
-    const isValidPassword = bcrypt.compareSync(password, user[0].password);
+
+    const user = users[0];
+    const isValidPassword = bcrypt.compareSync(password, user.password);
     if (!isValidPassword) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
-    req.session.user = { id: user[0].id, name: user[0].name, email: user[0].email };
+
+    const [roleRows] = await pool.promise().query(
+      `SELECT r.name FROM roles r
+       JOIN user_roles ur ON ur.role_id = r.id
+       WHERE ur.user_id = ?`,
+      [user.id]
+    );
+    const roles = roleRows.map(r => r.name);
+
+    req.session.user = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      roles
+    };
+
     res.status(200).json({ message: "Login successful", user: req.session.user });
   } catch (error) {
     console.error("Login error:", error);
@@ -347,6 +377,63 @@ app.put('/api/user/profile', async (req, res) => {
     res.status(500).json({ error: 'Failed to save profile' });
   }
 });
+
+
+// Get number of comments for a product (for main page)
+app.get('/api/comments/count/:productId', async (req, res) => {
+  const { productId } = req.params;
+  try {
+    const [rows] = await pool.promise().query(
+      `SELECT COUNT(*) AS count FROM comments WHERE product_id = ? AND approved IS NOT FALSE`,
+      [productId]
+    );
+    res.json(rows[0]); // returns: { count: X }
+  } catch (err) {
+    console.error('Error fetching comment count:', err);
+    res.status(500).json({ error: 'Failed to fetch comment count' });
+  }
+});
+
+// Get all comments for a product (for product page)
+app.get('/api/comments/:productId', async (req, res) => {
+  const { productId } = req.params;
+  try {
+    const [rows] = await pool.promise().query(
+      `SELECT c.comment_text, c.created_at, u.name FROM comments c
+       JOIN users u ON c.user_id = u.id
+       WHERE c.product_id = ? AND c.approved IS NOT FALSE
+       ORDER BY c.created_at DESC`,
+      [productId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching comments:', err);
+    res.status(500).json({ error: 'Failed to fetch comments' });
+  }
+});
+
+
+// Get average rating for a product (for main page & product page)
+app.get('/api/ratings/:productId', async (req, res) => {
+  const { productId } = req.params;
+  try {
+    const [rows] = await pool.promise().query(
+      `SELECT 
+         ROUND(AVG(rating),1) AS average_rating,
+         COUNT(*) AS total_ratings
+       FROM ratings
+       WHERE product_id = ?`,
+      [productId]
+    );
+    res.json(rows[0]); // { average_rating: 4.5, total_ratings: 3 }
+  } catch (err) {
+    console.error('Error fetching ratings:', err);
+    res.status(500).json({ error: 'Failed to fetch ratings' });
+  }
+});
+
+
+
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);

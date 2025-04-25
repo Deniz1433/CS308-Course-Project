@@ -18,9 +18,6 @@ import MenuItem from '@mui/material/MenuItem';
 import Drawer from '@mui/material/Drawer';
 import InputBase from '@mui/material/InputBase';
 import Divider from '@mui/material/Divider';
-import List from '@mui/material/List';
-import ListItem from '@mui/material/ListItem';
-import ListItemText from '@mui/material/ListItemText';
 import { Add, Remove, ShoppingCart, ArrowDropDown } from '@mui/icons-material';
 
 // 1. Theme configuration
@@ -98,7 +95,7 @@ export function VisualsProvider({ children }) {
 export function Header({ user, onLogout, onOpenCart, cartCount }) {
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
-  const handleMenuOpen = (e) => setAnchorEl(e.currentTarget);
+  const handleMenuOpen = e => setAnchorEl(e.currentTarget);
   const handleMenuClose = () => setAnchorEl(null);
 
   return (
@@ -111,7 +108,9 @@ export function Header({ user, onLogout, onOpenCart, cartCount }) {
         <IconButton color="inherit" onClick={onOpenCart} sx={{ ml: 1 }}>
           <ShoppingCart />
           {cartCount > 0 && (
-            <Box component="span" sx={{ ml: 0.5, fontSize: '0.9rem' }}>{cartCount}</Box>
+            <Box component="span" sx={{ ml: 0.5, fontSize: '0.9rem' }}>
+              {cartCount}
+            </Box>
           )}
         </IconButton>
         {user ? (
@@ -130,21 +129,40 @@ export function Header({ user, onLogout, onOpenCart, cartCount }) {
               anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
               transformOrigin={{ vertical: 'top', horizontal: 'right' }}
             >
-              <MenuItem onClick={() => { handleMenuClose(); window.location.href = '/profile'; }}>My Profile</MenuItem>
-              <MenuItem onClick={() => { handleMenuClose(); window.location.href = '/orders'; }}>My Orders</MenuItem>
+              <MenuItem onClick={() => { handleMenuClose(); window.location.href = '/profile'; }}>
+                My Profile
+              </MenuItem>
+              <MenuItem onClick={() => { handleMenuClose(); window.location.href = '/orders'; }}>
+                My Orders
+              </MenuItem>
               <Divider />
-              <MenuItem onClick={() => { handleMenuClose(); onLogout(); }}>Logout</MenuItem>
+              <MenuItem onClick={() => { handleMenuClose(); onLogout(); }}>
+                Logout
+              </MenuItem>
             </Menu>
           </Box>
         ) : (
-          <Button color="inherit" component="a" href="/login" sx={{ ml: 2 }}>Login</Button>
+          <Button color="inherit" component="a" href="/login" sx={{ ml: 2 }}>
+            Login
+          </Button>
         )}
       </Toolbar>
     </HeaderBar>
   );
 }
 
-export function ProductCardItem({ product, onAdd, onView, quantity, onIncrement, onDecrement, onQuantityChange }) {
+export function ProductCardItem({
+  product,
+  onAdd,
+  onView,
+  quantity,
+  onIncrement,
+  onDecrement,
+  onQuantityChange,
+  commentCount = 0,
+  averageRating = 0,
+  totalRatings = 0
+}) {
   return (
     <ProductCard>
       <CardMedia
@@ -156,7 +174,7 @@ export function ProductCardItem({ product, onAdd, onView, quantity, onIncrement,
         sx={{ cursor: 'pointer', objectFit: 'contain', backgroundColor: '#fff' }}
       />
       <CardContent>
-        <Typography gutterBottom variant="h5" component="div">
+        <Typography gutterBottom variant="h5">
           {product.name}
         </Typography>
         <Typography variant="body2" color="text.secondary">
@@ -168,17 +186,31 @@ export function ProductCardItem({ product, onAdd, onView, quantity, onIncrement,
         <Typography variant="body2" color="text.secondary">
           Stock: {product.stock}
         </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          {commentCount} {commentCount === 1 ? 'comment' : 'comments'}
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          {averageRating > 0
+            ? `★ ${averageRating} (${totalRatings} ratings)`
+            : 'No ratings yet'}
+        </Typography>
       </CardContent>
       <CardActions>
-        <IconButton size="small" onClick={onDecrement} disabled={quantity <= 1}><Remove /></IconButton>
+        <IconButton size="small" onClick={onDecrement} disabled={quantity <= 1}>
+          <Remove />
+        </IconButton>
         <InputBase
           type="number"
           value={quantity}
           onChange={e => onQuantityChange(Number(e.target.value))}
           inputProps={{ min: 1, max: product.stock, style: { width: 40, textAlign: 'center' } }}
         />
-        <IconButton size="small" onClick={onIncrement} disabled={quantity >= product.stock}><Add /></IconButton>
-        <Button size="small" variant="contained" onClick={() => onAdd(product, quantity)}>Add to Cart</Button>
+        <IconButton size="small" onClick={onIncrement} disabled={quantity >= product.stock}>
+          <Add />
+        </IconButton>
+        <Button size="small" variant="contained" onClick={() => onAdd(product, quantity)}>
+          Add to Cart
+        </Button>
       </CardActions>
     </ProductCard>
   );

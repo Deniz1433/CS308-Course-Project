@@ -5,6 +5,7 @@ import ProtectedRoute from './middleware/ProtectedRoute';
 import { SessionProvider, SessionContext } from './middleware/SessionManager';
 import Login from './pages/Login';
 import Register from './pages/Register';
+//import { RoleRoute } from './middleware/RoleRoute';
 import Payment from './pages/Payment';
 import ProductPage from './pages/ProductPage';
 import Orders from './pages/Orders';
@@ -88,7 +89,7 @@ export const CartProvider = ({ children }) => {
 };
 
 function ProductListing() {
-  const { cart, addToCart, removeFromCart, updateCartQuantity } = useContext(CartContext);
+  const { cart, addToCart, removeFromCart, updateCartQuantity} = useContext(CartContext);
   const { user, logout } = useContext(SessionContext);
   const navigate = useNavigate();
 
@@ -102,11 +103,23 @@ function ProductListing() {
   const [cartOpen, setCartOpen] = useState(false);
 
   useEffect(() => {
-    fetch('/api/products')
-      .then(res => res.json())
-      .then(data => setProducts(data))
-      .catch(console.error);
+    async function fetchWithExtras() {
+      const res = await fetch('/api/products');
+      const data = await res.json();
+  
+      const enriched = await Promise.all(data.map(async (product) => {
+        const [{ count: commentCount }] = await (await fetch(`/api/comments/count/${product.id}`)).json().then(r => [r]).catch(() => [{ count: 0 }]);
+        const { average_rating: averageRating = 0, total_ratings: totalRatings = 0 } = await (await fetch(`/api/ratings/${product.id}`)).json().catch(() => ({}));
+        return { ...product, commentCount, averageRating, totalRatings };
+      }));
+      
+  
+      setProducts(enriched);
+    }
+  
+    fetchWithExtras();
   }, []);
+  
 
   const categories = [...new Set(products.map(p => p.category))];
 
@@ -199,6 +212,9 @@ function ProductListing() {
             <Grid item key={product.id} xs={12} sm={6} md={4} lg={3}>
               <ProductCardItem
                 product={product}
+                commentCount={product.commentCount}
+                averageRating={product.averageRating}
+                totalRatings={product.totalRatings}
                 quantity={quantityMap[product.id] || 1}
                 onIncrement={() => handleIncrement(product.id, product.stock)}
                 onDecrement={() => handleDecrement(product.id)}
@@ -222,7 +238,7 @@ function ProductListing() {
               </IconButton>
             }>
               <ListItemAvatar>
-                <Avatar src={item.image_path} />
+                <Avatar src={item.image_path} />  
               </ListItemAvatar>
               <ListItemText
                 primary={item.name}
