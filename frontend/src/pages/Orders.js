@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Container,
   Typography,
+  Button,
   Paper,
   Box,
   Divider,
@@ -38,7 +39,7 @@ const Orders = () => {
       } catch (error) {
         console.error('Error fetching orders:', error);
       } finally {
-        setLoading(false);
+        setLoading(false);  
       }
     };
 
@@ -67,10 +68,18 @@ const Orders = () => {
             <Typography>Date: {new Date(order.order_date).toLocaleString()}</Typography>
             <Divider sx={{ my: 2 }} />
             {order.items.map((item, index) => (
-              <Box key={index} sx={{ mb: 1 }}>
+              <Box key={index} sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
                 <Typography>
                   - {item.name} x {item.quantity} @ ${item.price_at_time}
                 </Typography>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  sx={{ ml: 1 }}
+                  onClick={() => navigate(`/product-page/${item.product_id}`)}
+                >
+                  Review
+                </Button>
               </Box>
             ))}
           </Paper>

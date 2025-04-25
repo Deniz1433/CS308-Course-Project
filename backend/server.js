@@ -1,9 +1,8 @@
-// server.js
 const express = require("express");
 const mysql = require("mysql2");
 const bcrypt = require("bcryptjs");
 const cors = require("cors");
-const backendSession = require('./sessionmanager'); // Adjust path as needed
+const backendSession = require('./sessionmanager');
 require("dotenv").config();
 
 const app = express();
@@ -11,13 +10,12 @@ const port = 5000;
 
 app.use('/product_images', express.static('product_images'));
 app.use(cors({
-  origin: 'http://localhost:3000', // frontend origin
+  origin: 'http://localhost:3000',
   credentials: true
 }));
 app.use(express.json());
 app.use(backendSession);
 
-// Database connection
 const pool = mysql.createPool({
   host: process.env.DB_HOST || "localhost",
   user: process.env.DB_USER || "root",
@@ -28,19 +26,18 @@ const pool = mysql.createPool({
   queueLimit: 0,
 });
 
+// ----- PRODUCT ROUTES -----
+
 // Get all products
 app.get('/api/products', (req, res) => {
   const query = 'SELECT * FROM products';
   pool.query(query, (error, results) => {
-    if (error) {
-      console.error('Error fetching products:', error);
-      return res.status(500).json({ error: 'Database error' });
-    }
+    if (error) return res.status(500).json({ error: 'Database error' });
     res.json(results);
   });
 });
 
-// Get product by ID
+// Get single product
 app.get('/api/products/:id', (req, res) => {
   const productId = req.params.id;
   if (isNaN(productId)) {
@@ -48,16 +45,31 @@ app.get('/api/products/:id', (req, res) => {
   }
   const query = 'SELECT * FROM products WHERE id = ?';
   pool.query(query, [productId], (error, results) => {
-    if (error) {
-      console.error('Error fetching product:', error);
-      return res.status(500).json({ error: 'Database error' });
-    }
-    if (results.length === 0) {
-      return res.status(404).json({ error: 'Product not found' });
-    }
+    if (error) return res.status(500).json({ error: 'Database error' });
+    if (results.length === 0) return res.status(404).json({ error: 'Product not found' });
     res.json(results[0]);
   });
 });
+
+// Search products
+app.get('/api/search', (req, res) => {
+  const { q } = req.query;
+  if (!q) return res.status(400).json({ error: "Missing search query" });
+  const searchQuery = `%${q.toLowerCase()}%`;
+  const sql = `
+    SELECT * FROM products 
+    WHERE LOWER(name) LIKE ? 
+      OR LOWER(category) LIKE ? 
+      OR LOWER(description) LIKE ?
+  `;
+  pool.query(sql, [searchQuery, searchQuery, searchQuery], (error, results) => {
+    if (error) return res.status(500).json({ error: "Database error" });
+    if (results.length === 0) return res.status(404).json({ message: "No products found" });
+    res.json(results);
+  });
+});
+
+// ----- AUTH ROUTES -----
 
 // Register
 app.post("/api/register", async (req, res) => {
@@ -75,10 +87,8 @@ app.post("/api/register", async (req, res) => {
       "INSERT INTO users (name, email, home_address, password) VALUES (?, ?, ?, ?)",
       [name, email, home_address, hashedPassword]
     );
-    
+
     const userId = result.insertId;
-    
-    // Assign default 'customer' role
     const [[{ id: customerRoleId }]] = await pool.promise().query(
       "SELECT id FROM roles WHERE name = 'customer'"
     );
@@ -97,21 +107,15 @@ app.post("/api/register", async (req, res) => {
 // Login
 app.post("/api/login", async (req, res) => {
   const { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ error: "All fields are required" });
-  }
+  if (!email || !password) return res.status(400).json({ error: "All fields are required" });
 
   try {
     const [users] = await pool.promise().query("SELECT * FROM users WHERE email = ?", [email]);
-    if (users.length === 0) {
-      return res.status(401).json({ error: "Invalid email or password" });
-    }
+    if (users.length === 0) return res.status(401).json({ error: "Invalid email or password" });
 
     const user = users[0];
     const isValidPassword = bcrypt.compareSync(password, user.password);
-    if (!isValidPassword) {
-      return res.status(401).json({ error: "Invalid email or password" });
-    }
+    if (!isValidPassword) return res.status(401).json({ error: "Invalid email or password" });
 
     const [roleRows] = await pool.promise().query(
       `SELECT r.name FROM roles r
@@ -121,12 +125,7 @@ app.post("/api/login", async (req, res) => {
     );
     const roles = roleRows.map(r => r.name);
 
-    req.session.user = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      roles
-    };
+    req.session.user = { id: user.id, name: user.name, email: user.email, roles };
 
     res.status(200).json({ message: "Login successful", user: req.session.user });
   } catch (error) {
@@ -135,56 +134,55 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-// Payment Endpoint with stock deduction and order creation
+// Check session
+app.get('/api/session', (req, res) => {
+  if (req.session.user) res.json({ user: req.session.user });
+  else res.status(401).json({ error: 'Not logged in' });
+});
+
+// ----- ORDER ROUTES -----
+
+// Place order
 app.post('/api/payment', async (req, res) => {
   const { cardNumber, expiry, cvv, cart, userId } = req.body;
-
   if (!cart || !Array.isArray(cart) || cart.length === 0) {
     return res.status(400).json({ error: "Cart is empty or invalid." });
   }
-
   if (!userId) {
     return res.status(400).json({ error: "User ID is required." });
   }
 
   try {
-    // Simulate payment check
     if (cardNumber === '0000000000000000') {
       return res.status(400).json({ message: 'Payment declined: Invalid card.' });
     }
 
-    // Start transaction
     const connection = await pool.promise().getConnection();
     try {
       await connection.beginTransaction();
 
-      // Create order
       const [orderResult] = await connection.query(
         "INSERT INTO orders (user_id) VALUES (?)",
         [userId]
       );
       const orderId = orderResult.insertId;
 
-      // Insert order items and update stock
       for (const item of cart) {
         const [productRows] = await connection.query(
           "SELECT stock, price FROM products WHERE id = ?",
           [item.productId]
         );
-
         const product = productRows[0];
         if (!product) throw new Error(`Product ID ${item.productId} not found.`);
         if (product.stock < item.quantity) throw new Error(`Not enough stock for product ID ${item.productId}.`);
 
         const newStock = product.stock - item.quantity;
 
-        // Update stock
         await connection.query(
           "UPDATE products SET stock = ? WHERE id = ?",
           [newStock, item.productId]
         );
 
-        // Add to order_items
         await connection.query(
           "INSERT INTO order_items (order_id, product_id, quantity, price_at_time) VALUES (?, ?, ?, ?)",
           [orderId, item.productId, item.quantity, product.price]
@@ -207,42 +205,9 @@ app.post('/api/payment', async (req, res) => {
   }
 });
 
-
-
-// Place order
-app.post('/api/place-order', async (req, res) => {
-  const { userId, cartItems } = req.body;
-  if (!userId || !Array.isArray(cartItems) || cartItems.length === 0) {
-    return res.status(400).json({ error: "Invalid order data" });
-  }
-  const connection = await pool.promise().getConnection();
-  try {
-    await connection.beginTransaction();
-    const [orderResult] = await connection.query("INSERT INTO orders (user_id) VALUES (?)", [userId]);
-    const orderId = orderResult.insertId;
-    for (const item of cartItems) {
-      await connection.query(
-        "INSERT INTO order_items (order_id, product_id, quantity, price_at_time) VALUES (?, ?, ?, ?)",
-        [orderId, item.productId, item.quantity, item.price]
-      );
-    }
-    await connection.commit();
-    res.status(200).json({ message: "Order placed successfully", orderId });
-  } catch (error) {
-    await connection.rollback();
-    console.error("Order placement failed:", error);
-    res.status(500).json({ error: "Failed to place order" });
-  } finally {
-    connection.release();
-  }
-});
-
-// Get orders for a user
-// Add this to your server.js (after session setup)
+// Get user's orders
 app.get('/api/orders', async (req, res) => {
-  if (!req.session.user || !req.session.user.id) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  if (!req.session.user?.id) return res.status(401).json({ error: 'Unauthorized' });
 
   const userId = req.session.user.id;
 
@@ -278,130 +243,17 @@ app.get('/api/orders', async (req, res) => {
   }
 });
 
+// ----- COMMENT AND RATING ROUTES -----
 
-// Search products
-app.get('/api/search', (req, res) => {
-  const { q } = req.query;
-  if (!q) return res.status(400).json({ error: "Missing search query" });
-  const searchQuery = `%${q.toLowerCase()}%`;
-  const sql = `
-    SELECT * FROM products 
-    WHERE LOWER(name) LIKE ? 
-      OR LOWER(category) LIKE ? 
-      OR LOWER(description) LIKE ?
-  `;
-  pool.query(sql, [searchQuery, searchQuery, searchQuery], (error, results) => {
-    if (error) return res.status(500).json({ error: "Database error" });
-    if (results.length === 0) return res.status(404).json({ message: "No products found for your search." });
-    res.json(results);
-  });
-});
-
-app.get('/api/session', (req, res) => {
-  if (req.session.user) {
-    res.json({ user: req.session.user });
-  } else {
-    res.status(401).json({ error: 'Not logged in' });
-  }
-});
-
-/**
- * GET /api/user/profile
- * Returns the current user’s profile
- */
-app.get('/api/user/profile', async (req, res) => {
-  // ensure logged in
-  if (!req.session.user?.id) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  const userId = req.session.user.id;
-  try {
-    const [rows] = await pool.promise().query(
-      `SELECT id, name, email, home_address
-       FROM users
-       WHERE id = ?`,
-      [userId]
-    );
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    res.json(rows[0]);
-  } catch (err) {
-    console.error('Error fetching profile:', err);
-    res.status(500).json({ error: 'Failed to load profile' });
-  }
-});
-
-/**
- * PUT /api/user/profile
- * Updates name, home_address—and password if provided
- */
-app.put('/api/user/profile', async (req, res) => {
-  if (!req.session.user?.id) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  const userId = req.session.user.id;
-  const { name, home_address, password } = req.body;
-
-  if (!name) {
-    return res.status(400).json({ error: 'Name is required' });
-  }
-
-  try {
-    // Build update query dynamically
-    const fields = [];
-    const params = [];
-
-    fields.push('name = ?');
-    params.push(name);
-
-    // home_address can be null
-    fields.push('home_address = ?');
-    params.push(home_address || null);
-
-    if (password) {
-      const hashed = bcrypt.hashSync(password, 10);
-      fields.push('password = ?');
-      params.push(hashed);
-    }
-
-    // Append WHERE
-    params.push(userId);
-
-    const sql = `UPDATE users SET ${fields.join(', ')} WHERE id = ?`;
-    await pool.promise().query(sql, params);
-
-    res.json({ message: 'Profile updated successfully' });
-  } catch (err) {
-    console.error('Error updating profile:', err);
-    res.status(500).json({ error: 'Failed to save profile' });
-  }
-});
-
-
-// Get number of comments for a product (for main page)
-app.get('/api/comments/count/:productId', async (req, res) => {
-  const { productId } = req.params;
-  try {
-    const [rows] = await pool.promise().query(
-      `SELECT COUNT(*) AS count FROM comments WHERE product_id = ? AND approved IS NOT FALSE`,
-      [productId]
-    );
-    res.json(rows[0]); // returns: { count: X }
-  } catch (err) {
-    console.error('Error fetching comment count:', err);
-    res.status(500).json({ error: 'Failed to fetch comment count' });
-  }
-});
-
-// Get all comments for a product (for product page)
+// New: Get all comments (no approval filtering)
 app.get('/api/comments/:productId', async (req, res) => {
   const { productId } = req.params;
   try {
     const [rows] = await pool.promise().query(
-      `SELECT c.comment_text, c.created_at, u.name FROM comments c
+      `SELECT c.comment_text, c.created_at, u.name
+       FROM comments c
        JOIN users u ON c.user_id = u.id
-       WHERE c.product_id = ? AND c.approved IS NOT FALSE
+       WHERE c.product_id = ?
        ORDER BY c.created_at DESC`,
       [productId]
     );
@@ -412,28 +264,155 @@ app.get('/api/comments/:productId', async (req, res) => {
   }
 });
 
-
-// Get average rating for a product (for main page & product page)
+// New: Get average rating
 app.get('/api/ratings/:productId', async (req, res) => {
   const { productId } = req.params;
   try {
     const [rows] = await pool.promise().query(
-      `SELECT 
-         ROUND(AVG(rating),1) AS average_rating,
-         COUNT(*) AS total_ratings
+      `SELECT AVG(rating) AS average_rating, COUNT(*) AS total_ratings
        FROM ratings
        WHERE product_id = ?`,
       [productId]
     );
-    res.json(rows[0]); // { average_rating: 4.5, total_ratings: 3 }
+    res.json(rows[0]);
   } catch (err) {
-    console.error('Error fetching ratings:', err);
-    res.status(500).json({ error: 'Failed to fetch ratings' });
+    console.error('Error fetching rating:', err);
+    res.status(500).json({ error: 'Failed to fetch rating' });
   }
 });
 
+// Can user review a product?
+app.get('/api/can-review/:productId', async (req, res) => {
+  if (!req.session.user?.id) return res.status(401).json({ error: 'Unauthorized' });
 
+  const userId = req.session.user.id;
+  const { productId } = req.params;
 
+  try {
+    const [rows] = await pool.promise().query(
+      `SELECT 1
+       FROM orders o
+       JOIN order_items oi ON o.id = oi.order_id
+       WHERE o.user_id = ? AND oi.product_id = ?`,
+      [userId, productId]
+    );
+
+    res.json({ canReview: rows.length > 0 });
+  } catch (err) {
+    console.error('Error checking review eligibility:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Post rating
+app.post('/api/ratings', async (req, res) => {
+  if (!req.session.user?.id) return res.status(401).json({ error: 'Unauthorized' });
+
+  const { productId, rating } = req.body;
+  const userId = req.session.user.id;
+
+  if (!productId || !rating) return res.status(400).json({ error: 'Product ID and rating are required.' });
+
+  try {
+    await pool.promise().query(
+      `INSERT INTO ratings (user_id, product_id, rating)
+       VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE rating = VALUES(rating)`,
+      [userId, productId, rating]
+    );
+
+    res.json({ message: 'Rating saved successfully.' });
+  } catch (err) {
+    console.error('Rating error:', err);
+    res.status(500).json({ error: 'Failed to save rating.' });
+  }
+});
+
+// Post comment
+app.post('/api/comments', async (req, res) => {
+  if (!req.session.user?.id) return res.status(401).json({ error: 'Unauthorized' });
+
+  const { productId, comment_text } = req.body;
+  const userId = req.session.user.id;
+
+  if (!productId || !comment_text) return res.status(400).json({ error: 'Product ID and comment required.' });
+
+  try {
+    const [ratingRows] = await pool.promise().query(
+      `SELECT * FROM ratings WHERE user_id = ? AND product_id = ?`,
+      [userId, productId]
+    );
+
+    if (ratingRows.length === 0) {
+      return res.status(403).json({ error: 'You must rate before commenting.' });
+    }
+
+    await pool.promise().query(
+      `INSERT INTO comments (user_id, product_id, comment_text) VALUES (?, ?, ?)`,
+      [userId, productId, comment_text]
+    );
+
+    res.json({ message: 'Comment added successfully.' });
+  } catch (err) {
+    console.error('Comment error:', err);
+    res.status(500).json({ error: 'Failed to post comment.' });
+  }
+});
+
+// Profile routes
+app.get('/api/user/profile', async (req, res) => {
+  if (!req.session.user?.id) return res.status(401).json({ error: 'Unauthorized' });
+
+  const userId = req.session.user.id;
+  try {
+    const [rows] = await pool.promise().query(
+      `SELECT id, name, email, home_address FROM users WHERE id = ?`,
+      [userId]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Profile error:', err);
+    res.status(500).json({ error: 'Failed to fetch profile' });
+  }
+});
+
+// Update profile
+app.put('/api/user/profile', async (req, res) => {
+  if (!req.session.user?.id) return res.status(401).json({ error: 'Unauthorized' });
+
+  const userId = req.session.user.id;
+  const { name, home_address, password } = req.body;
+
+  if (!name) return res.status(400).json({ error: 'Name is required' });
+
+  try {
+    const fields = [];
+    const params = [];
+
+    fields.push('name = ?');
+    params.push(name);
+
+    fields.push('home_address = ?');
+    params.push(home_address || null);
+
+    if (password) {
+      const hashed = bcrypt.hashSync(password, 10);
+      fields.push('password = ?');
+      params.push(hashed);
+    }
+
+    params.push(userId);
+
+    const sql = `UPDATE users SET ${fields.join(', ')} WHERE id = ?`;
+    await pool.promise().query(sql, params);
+
+    res.json({ message: 'Profile updated successfully' });
+  } catch (err) {
+    console.error('Update profile error:', err);
+    res.status(500).json({ error: 'Failed to save profile' });
+  }
+});
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);

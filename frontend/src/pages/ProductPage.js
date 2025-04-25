@@ -1,4 +1,5 @@
 // --- File: src/pages/ProductPage.js ---
+
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { CartContext } from '../App';
@@ -13,55 +14,68 @@ function ProductPage() {
   const [quantity, setQuantity] = useState(1);
   const [comments, setComments] = useState([]);
   const [avgRating, setAvgRating] = useState(null);
+  const [canReview, setCanReview] = useState(false);
+  const [userRating, setUserRating] = useState(0);
+  const [commentText, setCommentText] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const { addToCart } = useContext(CartContext);
   const navigate = useNavigate();
 
+
+
+  const fetchProduct = async () => {
+    try {
+      const response = await fetch(`/api/products/${id}`);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      setProduct(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchComments = async () => {
+    try {
+      const res = await fetch(`/api/comments/${id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setComments(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch comments", err);
+    }
+  };
+
+  const fetchRating = async () => {
+    try {
+      const res = await fetch(`/api/ratings/${id}`);
+      if (res.ok) {
+        const { average_rating } = await res.json();
+        setAvgRating(average_rating);
+      }
+    } catch (err) {
+      console.error("Failed to fetch rating", err);
+    }
+  };
+
+  const fetchCanReview = async () => {
+    try {
+      const res = await fetch(`/api/can-review/${id}`, { credentials: 'include' });
+      const data = await res.json();
+      setCanReview(data.canReview);
+    } catch (err) {
+      console.error('Failed to fetch review eligibility:', err);
+    }
+  };
+
   useEffect(() => {
-    let isMounted = true;
-
-    const fetchProduct = async () => {
-      try {
-        const response = await fetch(`/api/products/${id}`);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const data = await response.json();
-        if (isMounted) setProduct(data);
-      } catch (err) {
-        if (isMounted) setError(err.message);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-
-    const fetchComments = async () => {
-      try {
-        const res = await fetch(`/api/comments/${id}`);
-        if (res.ok) {
-          const data = await res.json();
-          setComments(data);
-        }
-      } catch (err) {
-        console.error("Failed to fetch comments", err);
-      }
-    };
-
-    const fetchRating = async () => {
-      try {
-        const res = await fetch(`/api/ratings/${id}`);
-        if (res.ok) {
-          const { average_rating } = await res.json();
-          setAvgRating(average_rating);
-        }
-      } catch (err) {
-        console.error("Failed to fetch rating", err);
-      }
-    };
-
     fetchProduct();
     fetchComments();
     fetchRating();
-
-    return () => { isMounted = false; };
+    fetchCanReview();
   }, [id]);
 
   const handleIncrement = () => {
@@ -101,6 +115,45 @@ function ProductPage() {
 
   const handleGoBack = () => {
     navigate('/');
+  };
+
+  const handleSubmitReview = async () => {
+    try {
+      setSubmitting(true);
+
+      // First submit rating
+      if (userRating) {
+        await fetch('/api/ratings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ productId: id, rating: userRating })
+        });
+      }
+
+      // Then submit comment only if comment is written
+      if (userRating && commentText.trim()) {
+        await fetch('/api/comments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ productId: id, comment_text: commentText })
+        });
+        setCommentText('');
+      }
+
+      // After submission, refresh rating and comments
+      await Promise.all([
+        fetchComments(),
+        fetchRating(),
+      ]);
+
+      alert('Thank you for your review!');
+    } catch (err) {
+      console.error('Failed to submit review:', err);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (loading) return <div className="loading">Loading...</div>;
@@ -178,6 +231,34 @@ function ProductPage() {
           </ul>
         )}
       </div>
+
+      {/* New Section: Review Form */}
+      {canReview && (
+        <div className="review-form">
+          <h3>Write Your Review</h3>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+            <Rating
+              name="user-rating"
+              value={userRating}
+              onChange={(e, newValue) => setUserRating(newValue)}
+            />
+          </Box>
+          <textarea
+            value={commentText}
+            onChange={(e) => setCommentText(e.target.value)}
+            placeholder="Write your comment (optional)"
+            rows={4}
+            style={{ width: '100%', marginBottom: '10px' }}
+          />
+          <button
+            onClick={handleSubmitReview}
+            disabled={submitting || !userRating}
+            className="submit-review-btn"
+          >
+            {submitting ? "Submitting..." : "Submit Review"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
