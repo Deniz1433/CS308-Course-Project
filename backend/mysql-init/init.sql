@@ -136,7 +136,7 @@ ADD COLUMN price_approved BOOLEAN DEFAULT FALSE;
 
 -- Add comment approval column for product managers
 ALTER TABLE comments
-ADD COLUMN approved BOOLEAN DEFAULT NULL;
+ADD COLUMN approved BOOLEAN DEFAULT FALSE;
 
 INSERT INTO roles (name) VALUES 
 ('customer'),

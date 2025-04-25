@@ -14,6 +14,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
 import { CartContext } from '../App';
+import { SessionContext } from '../middleware/SessionManager';
 
 const PageContainer = styled(Box)(({ theme }) => ({
   padding: theme.spacing(4),
@@ -49,6 +50,39 @@ const SectionContainer = styled(Box)(({ theme }) => ({
   marginTop: theme.spacing(4),
 }));
 
+function Toast({ message, onClose }) {
+  const [progress, setProgress] = useState(100);
+
+  useEffect(() => {
+    const totalDuration = 4000; // 4 seconds
+    const interval = 100;
+    const decrement = 100 * (interval / totalDuration);
+
+    const timer = setInterval(() => {
+      setProgress(prev => {
+        if (prev <= 0) {
+          clearInterval(timer);
+          onClose();
+          return 0;
+        }
+        return prev - decrement;
+      });
+    }, interval);
+
+    return () => clearInterval(timer);
+  }, [onClose]);
+
+  return (
+    <Box position="fixed" top={16} left={16} zIndex={1300} bgcolor="black" color="white" px={2} py={1} borderRadius={1}>
+      <Typography variant="body2">{message}</Typography>
+      <Box mt={1} height={4} bgcolor="grey.500">
+        <Box height="100%" bgcolor="primary.main" width={`${progress}%`} />
+      </Box>
+    </Box>
+  );
+}
+
+
 function ProductPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -64,16 +98,28 @@ function ProductPage() {
   const [userRating, setUserRating] = useState(0);
   const [commentText, setCommentText] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [pendingReview, setPendingReview] = useState(null);
+  const [showPending, setShowPending] = useState(false);
+  const { user } = useContext(SessionContext);
+  
+  useEffect(() => {
+	  if (!user) {
+		setPendingReview(null);
+	  }
+	}, [user]);
+
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [prodRes, commRes, rateRes, canRes] = await Promise.all([
-          fetch(`/api/products/${id}`),
-          fetch(`/api/comments/${id}`),
-          fetch(`/api/ratings/${id}`),
-          fetch(`/api/can-review/${id}`, { credentials: 'include' }),
-        ]);
+        const [prodRes, commRes, rateRes, canRes, pendingRes] = await Promise.all([
+		  fetch(`/api/products/${id}`),
+		  fetch(`/api/comments/${id}`),
+		  fetch(`/api/ratings/${id}`),
+		  fetch(`/api/can-review/${id}`, { credentials: 'include' }),
+		  fetch(`/api/pending-comment/${id}`, { credentials: 'include' }),
+		]);
         if (!prodRes.ok) throw new Error(`Failed to load product (${prodRes.status})`);
         const prodData = await prodRes.json();
         setProduct(prodData);
@@ -87,6 +133,17 @@ function ProductPage() {
           const { canReview } = await canRes.json();
           setCanReview(canReview);
         }
+		if (pendingRes.ok) {
+		  const pendingData = await pendingRes.json();
+		  if (pendingData) {
+			setPendingReview({
+			  id: pendingData.comment_id, // store comment id
+			  rating: userRating, // might not be available unless you store it in database too, otherwise just 0
+			  comment: pendingData.comment_text,
+			  date: new Date(pendingData.created_at)
+			});
+		  }
+		}
       } catch (err) {
         setError(err.message);
       } finally {
@@ -100,36 +157,69 @@ function ProductPage() {
   const handleIncrement = () => product && setQuantity(q => Math.min(q + 1, product.stock));
   const handleDecrement = () => setQuantity(q => Math.max(q - 1, 1));
   const handleAddToCart = () => product && addToCart(product, quantity);
+  async function handleDeleteComment(commentId) {
+	  try {
+		await fetch(`/api/delete-comment/${commentId}`, { method: 'DELETE', credentials: 'include' });
 
-  const handleSubmitReview = async () => {
-    setSubmitting(true);
-    try {
-      if (userRating) {
-        await fetch('/api/ratings', {
-          method: 'POST', credentials: 'include', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ productId: id, rating: userRating })
-        });
-      }
-      if (userRating && commentText.trim()) {
-        await fetch('/api/comments', {
-          method: 'POST', credentials: 'include', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ productId: id, comment_text: commentText })
-        });
-        setCommentText('');
-      }
-      // Refresh
-      const [newComments, newRating] = await Promise.all([
-        fetch(`/api/comments/${id}`).then(r=>r.json()),
-        fetch(`/api/ratings/${id}`).then(r=>r.json())
-      ]);
-      setComments(newComments);
-      setAvgRating(newRating.average_rating);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setSubmitting(false);
-    }
-  };
+		setComments(prev => prev.filter(c => c.comment_id !== commentId));
+		setToastMessage('Comment deleted successfully.');
+
+		// Refresh rating after deleting
+		const newRating = await fetch(`/api/ratings/${id}`).then(r => r.json());
+		setAvgRating(newRating.average_rating);
+
+	  } catch (err) {
+		console.error('Error deleting comment:', err);
+		setToastMessage('Failed to delete comment.');
+	  }
+	}
+
+
+
+	const handleSubmitReview = async () => {
+	  setSubmitting(true);
+	  try {
+		if (userRating) {
+		  await fetch('/api/ratings', {
+			method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ productId: id, rating: userRating })
+		  });
+		}
+
+		if (userRating && commentText.trim()) {
+		  await fetch('/api/comments', {
+			method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ productId: id, comment_text: commentText })
+		  });
+		  setCommentText('');
+		  setToastMessage('Your comment was submitted for review.');
+
+		  // ✅ New: Refetch your pending comment properly
+		  const pendingRes = await fetch(`/api/pending-comment/${id}`, { credentials: 'include' });
+		  if (pendingRes.ok) {
+			const pendingData = await pendingRes.json();
+			if (pendingData) {
+			  setPendingReview({
+				id: pendingData.comment_id,
+				rating: userRating, // if you store rating too, otherwise can be 0
+				comment: pendingData.comment_text,
+				date: new Date(pendingData.created_at)
+			  });
+			}
+		  }
+		}
+
+		// Only refresh rating, not comments (since pending is hidden)
+		const newRating = await fetch(`/api/ratings/${id}`).then(r => r.json());
+		setAvgRating(newRating.average_rating);
+
+	  } catch (err) {
+		console.error(err);
+	  } finally {
+		setSubmitting(false);
+	  }
+	};
+
 
   if (loading) return <Typography align="center">Loading...</Typography>;
   if (error) return <Typography color="error" align="center">Error: {error}</Typography>;
@@ -170,6 +260,34 @@ function ProductPage() {
           </InfoContainer>
         </Grid>
       </Grid>
+	  
+	  {user && pendingReview && (
+	  <SectionContainer>
+		<Box display="flex" alignItems="center" justifyContent="space-between" bgcolor="#fffde7" px={2} py={1} borderRadius={1} mb={2}>
+		  <Button color="inherit" onClick={() => setShowPending(prev => !prev)}>
+			You have 1 pending review
+		  </Button>
+		  <Button color="error" onClick={async () => {
+			  if (pendingReview?.id) {
+				await handleDeleteComment(pendingReview.id);
+				setPendingReview(null);
+			  }
+			}}>
+			  Delete
+			</Button>
+		</Box>
+		{showPending && (
+		  <Box sx={{ opacity: 0.5, border: '1px dashed grey', p: 2, mb: 2 }}>
+			<Typography variant="subtitle2">
+			  You ({pendingReview.date.toLocaleDateString()})
+			</Typography>
+			<Rating value={pendingReview.rating} precision={0.5} readOnly sx={{ mb: 1 }} />
+			<Typography variant="body1">{pendingReview.comment}</Typography>
+		  </Box>
+		)}
+	  </SectionContainer>
+	)}
+
 
       <SectionContainer>
         <Typography variant="h5">Rating</Typography>
@@ -189,13 +307,25 @@ function ProductPage() {
           <Typography>No comments yet.</Typography>
         ) : (
           <Box component="ul" sx={{ pl: 2, mt: 1 }}>
-            {comments.map((c,i) => (
-              <li key={i}>
-                <Typography variant="subtitle2">{c.name} <Typography component="span" variant="body2" color="text.secondary">({new Date(c.created_at).toLocaleDateString()})</Typography></Typography>
-                <Typography variant="body1">{c.comment_text}</Typography>
-                <Divider sx={{ my: 1 }} />
-              </li>
-            ))}
+            {comments.map((c, i) => (
+			  <li key={i}>
+				<Box display="flex" alignItems="center" justifyContent="space-between">
+				  <Typography variant="subtitle2">
+					{c.name} 
+					<Typography component="span" variant="body2" color="text.secondary">
+					  ({new Date(c.created_at).toLocaleDateString()})
+					</Typography>
+				  </Typography>
+				  {user && c.user_id === user.id && (
+					  <Button color="error" size="small" onClick={() => handleDeleteComment(c.comment_id)}>
+						Delete
+					  </Button>
+					)}
+				</Box>
+				<Typography variant="body1">{c.comment_text}</Typography>
+				<Divider sx={{ my: 1 }} />
+			  </li>
+			))}
           </Box>
         )}
       </SectionContainer>
@@ -222,6 +352,7 @@ function ProductPage() {
           </Box>
         </SectionContainer>
       )}
+	{toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage('')} />}
     </PageContainer>
   );
 }
