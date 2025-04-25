@@ -250,12 +250,19 @@ app.get('/api/comments/:productId', async (req, res) => {
   const { productId } = req.params;
   try {
     const [rows] = await pool.promise().query(
-      `SELECT c.id AS comment_id, c.user_id, c.comment_text, c.created_at, u.name
-       FROM comments c
-       JOIN users u ON c.user_id = u.id
-       WHERE c.product_id = ?
-         AND c.approved = TRUE
-       ORDER BY c.created_at DESC`,
+      `SELECT 
+	  c.id AS comment_id,
+	  c.user_id,
+	  c.comment_text,
+	  c.created_at,
+	  u.name,
+	  r.rating
+	FROM comments c
+	JOIN users u ON c.user_id = u.id
+	LEFT JOIN ratings r ON r.user_id = c.user_id AND r.product_id = c.product_id
+	WHERE c.product_id = ?
+	  AND c.approved = TRUE
+	ORDER BY c.created_at DESC`,
       [productId]
     );
     res.json(rows);
@@ -274,13 +281,19 @@ app.get('/api/pending-comment/:productId', async (req, res) => {
 
   try {
     const [rows] = await pool.promise().query(
-      `SELECT id AS comment_id, comment_text, created_at
-       FROM comments
-       WHERE product_id = ?
-         AND user_id = ?
-         AND approved = FALSE
-       ORDER BY created_at DESC
-       LIMIT 1`,
+      `SELECT 
+	  c.id AS comment_id,
+	  c.user_id,
+	  c.comment_text,
+	  c.created_at,
+	  r.rating
+	FROM comments c
+	LEFT JOIN ratings r ON r.user_id = c.user_id AND r.product_id = c.product_id
+	WHERE c.product_id = ?
+	  AND c.user_id = ?
+	  AND c.approved = FALSE
+	ORDER BY c.created_at DESC
+	LIMIT 1`,
       [productId, userId]
     );
 
