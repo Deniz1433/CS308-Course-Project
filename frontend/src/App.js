@@ -38,6 +38,7 @@ import Avatar from '@mui/material/Avatar';
 import ListItemText from '@mui/material/ListItemText';
 import { Add, Remove, ShoppingCart, ArrowDropDown, Delete } from '@mui/icons-material';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
+import InvoicePage from './pages/Invoice';
 
 // 1. Theme configuration
 const theme = createTheme({
@@ -403,7 +404,9 @@ function App() {
               <Route path="/product-page/:id" element={<ProductPage />} />
               <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-			  <Route path="/admin" element={<AdminInterface />} />
+              <Route path="/invoice/:orderId" element={<InvoicePage />} />
+			        <Route path="/admin" element={<AdminInterface />} />
+
             </Routes>
           </Router>
         </CartProvider>
