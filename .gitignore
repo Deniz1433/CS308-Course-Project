@@ -36,3 +36,5 @@ docker-compose.override.yml
 
 # Optional if using npm workspaces
 *.tgz
+
+invoices/
