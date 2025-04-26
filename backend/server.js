@@ -543,6 +543,61 @@ app.put('/api/user/profile', async (req, res) => {
   }
 });
 
+// Get current user's wishlist
+app.get('/api/wishlist', async (req, res) => {
+  if (!req.session.user?.id) return res.status(401).json({ error: 'Unauthorized' });
+  const userId = req.session.user.id;
+  try {
+    const [rows] = await pool.promise().query(
+      `SELECT p.*
+         FROM wishlists w
+         JOIN products p ON w.product_id = p.id
+        WHERE w.user_id = ?`,
+      [userId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching wishlist:', err);
+    res.status(500).json({ error: 'Failed to fetch wishlist' });
+  }
+});
+
+// Add a product to wishlist
+app.post('/api/wishlist', async (req, res) => {
+  if (!req.session.user?.id) return res.status(401).json({ error: 'Unauthorized' });
+  const userId = req.session.user.id;
+  const { productId } = req.body;
+  if (!productId) return res.status(400).json({ error: 'Product ID required' });
+  try {
+    await pool.promise().query(
+      `INSERT IGNORE INTO wishlists (user_id, product_id) VALUES (?, ?)`,
+      [userId, productId]
+    );
+    res.json({ message: 'Added to wishlist' });
+  } catch (err) {
+    console.error('Error adding to wishlist:', err);
+    res.status(500).json({ error: 'Failed to add to wishlist' });
+  }
+});
+
+// Remove a product from wishlist
+app.delete('/api/wishlist/:productId', async (req, res) => {
+  if (!req.session.user?.id) return res.status(401).json({ error: 'Unauthorized' });
+  const userId = req.session.user.id;
+  const productId = req.params.productId;
+  try {
+    await pool.promise().query(
+      `DELETE FROM wishlists WHERE user_id = ? AND product_id = ?`,
+      [userId, productId]
+    );
+    res.json({ message: 'Removed from wishlist' });
+  } catch (err) {
+    console.error('Error removing from wishlist:', err);
+    res.status(500).json({ error: 'Failed to remove from wishlist' });
+  }
+});
+
+
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });

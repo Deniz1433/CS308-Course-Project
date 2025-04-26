@@ -10,6 +10,7 @@ import ProductPage from './pages/ProductPage';
 import Orders from './pages/Orders';
 import ProfilePage from './pages/Profile';
 import AdminInterface from './pages/AdminInterface'; // adjust path if needed
+import Wishlist from './pages/Wishlist';
 
 
 // MUI & Theming Imports
@@ -126,7 +127,7 @@ function Header({ user, onLogout, onOpenCart, cartCount }) {
         </IconButton>
         {user ? (
           <Box sx={{ ml: 2 }}>
-            <Button color="inherit" onClick={handleMenuOpen} endIcon={<ArrowDropDown />}> 
+            <Button color="inherit" onClick={handleMenuOpen} endIcon={<ArrowDropDown />}>
               {user.name}
             </Button>
             <Menu
@@ -136,11 +137,14 @@ function Header({ user, onLogout, onOpenCart, cartCount }) {
               anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
               transformOrigin={{ vertical: 'top', horizontal: 'right' }}
             >
-			  {(user?.role === 'product_manager' || user?.role === 'sales_manager') && (
-			  <MenuItem onClick={() => { handleMenuClose(); window.location.href = '/admin'; }}>
-				Admin Interface
-			  </MenuItem>
-			  )}
+              {(user?.role === 'product_manager' || user?.role === 'sales_manager') && (
+                <MenuItem onClick={() => { handleMenuClose(); window.location.href = '/admin'; }}>
+                  Admin Interface
+                </MenuItem>
+              )}
+              <MenuItem onClick={() => { handleMenuClose(); window.location.href = '/wishlist'; }}>
+                My Wishlist
+              </MenuItem>
               <MenuItem onClick={() => { handleMenuClose(); window.location.href = '/profile'; }}>
                 My Profile
               </MenuItem>
@@ -404,6 +408,15 @@ function App() {
               <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
 			  <Route path="/admin" element={<AdminInterface />} />
+        <Route 
+          path="/wishlist" 
+          element={
+            <ProtectedRoute>
+              <Wishlist />
+            </ProtectedRoute>
+          } 
+        />
+
             </Routes>
           </Router>
         </CartProvider>
