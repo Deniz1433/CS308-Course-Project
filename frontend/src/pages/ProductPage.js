@@ -206,31 +206,40 @@ function ProductPage() {
 
 
 	const handleSubmitReview = async () => {
+	  if (pendingReview) {
+		setToastMessage('You already have a pending review. Please wait for approval.');
+		return;
+	  }
+
 	  setSubmitting(true);
 	  try {
 		if (userRating) {
 		  await fetch('/api/ratings', {
-			method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+			method: 'POST',
+			credentials: 'include',
+			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ productId: id, rating: userRating })
 		  });
 		}
 
 		if (userRating && commentText.trim()) {
 		  await fetch('/api/comments', {
-			method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+			method: 'POST',
+			credentials: 'include',
+			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ productId: id, comment_text: commentText })
 		  });
 		  setCommentText('');
 		  setToastMessage('Your comment was submitted for review.');
 
-		  // ✅ New: Refetch your pending comment properly
+		  // ✅ Refetch pending review properly
 		  const pendingRes = await fetch(`/api/pending-comment/${id}`, { credentials: 'include' });
 		  if (pendingRes.ok) {
 			const pendingData = await pendingRes.json();
 			if (pendingData) {
 			  setPendingReview({
 				id: pendingData.comment_id,
-				rating: userRating, // if you store rating too, otherwise can be 0
+				rating: userRating,
 				comment: pendingData.comment_text,
 				date: new Date(pendingData.created_at)
 			  });
@@ -238,7 +247,7 @@ function ProductPage() {
 		  }
 		}
 
-		// Only refresh rating, not comments (since pending is hidden)
+		// Only refresh rating, not comments
 		const newRating = await fetch(`/api/ratings/${id}`).then(r => r.json());
 		setAvgRating(newRating.average_rating);
 
@@ -248,6 +257,7 @@ function ProductPage() {
 		setSubmitting(false);
 	  }
 	};
+
 
 
   if (loading) return <Typography align="center">Loading...</Typography>;
