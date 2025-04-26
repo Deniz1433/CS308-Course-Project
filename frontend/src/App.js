@@ -315,10 +315,19 @@ function ProductListing() {
 
   const handleProceed = () => {
     setCartOpen(false);
-    if (!user) navigate('/login', { state: { from: '/payment' } });
-    else navigate('/payment');
+  
+    // 1) never navigate if the cart is empty
+    if (cart.length === 0) return;
+  
+    // 2) if not logged in, go to login (and back to payment after)
+    if (!user) {
+      navigate('/login', { state: { from: '/payment' } });
+      return;
+    }
+  
+    // 3) otherwise go to payment
+    navigate('/payment');
   };
-
   return (
     <>
       <Header user={user} onLogout={handleLogout} onOpenCart={() => setCartOpen(true)} cartCount={cart.reduce((acc, i) => acc + i.quantity, 0)} />

@@ -32,13 +32,6 @@ export default function Payment() {
     }
   }, [sessionLoading, user, navigate]);
 
-  // 1️⃣ redirect if cart is empty (once we know login state)
-  useEffect(() => {
-    if (!sessionLoading && user && cart.length === 0) {
-      navigate('/', { replace: true });
-    }
-  }, [sessionLoading, user, cart, navigate]);
-
   // show a spinner while we're checking login
   if (sessionLoading) {
     return (
