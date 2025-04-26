@@ -294,6 +294,7 @@ function ProductPage() {
         </Grid>
         <Grid item xs={12} md={6}>
           <InfoContainer>
+            <InfoContainer>
 			  <Typography variant="h4">{product.name}</Typography>
 
 			  <Typography>
@@ -342,6 +343,57 @@ function ProductPage() {
 				${Number(product.price).toFixed(2)}
 			  </Typography>
 			</InfoContainer>
+
+            <QuantityContainer>
+			  <IconButton onClick={handleDecrement} disabled={product.stock === 0 || quantity === 1}>
+				<RemoveIcon />
+			  </IconButton>
+			  <TextField
+				type="number"
+				value={product.stock === 0 ? 0 : quantity}
+				onChange={e => {
+				  if (product.stock > 0) {
+					setQuantity(Math.max(1, Math.min(Number(e.target.value) || 1, product.stock)));
+				  }
+				}}
+				inputProps={{ 
+				  min: product.stock === 0 ? 0 : 1, 
+				  max: product.stock, 
+				  style: { textAlign: 'center', width: 60 }
+				}}
+				size="small"
+				disabled={product.stock === 0}
+			  />
+			  <IconButton onClick={handleIncrement} disabled={product.stock === 0 || quantity >= product.stock}>
+				<AddIcon />
+			  </IconButton>
+			</QuantityContainer>
+            {product.stock === 0 ? (
+			  <Typography
+				variant="body1"
+				sx={{
+				  backgroundColor: 'warning.main',
+				  color: '#000',
+				  fontWeight: 'bold',
+				  p: 1,
+				  borderRadius: 1,
+				  textAlign: 'center'
+				}}
+			  >
+				Out of Stock
+			  </Typography>
+			) : (
+			  <Button variant="contained" onClick={handleAddToCart}>
+				Add to Cart
+			  </Button>
+			)}
+			{user && (
+               <FormControlLabel
+                 control={<Checkbox checked={isWishlisted} onChange={handleWishlistToggle} />}
+                 label="Add to Wishlist"
+               />
+             )}
+          </InfoContainer>
         </Grid>
       </Grid>
 	  
