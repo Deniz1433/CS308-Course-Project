@@ -138,7 +138,7 @@ function Header({ user, onLogout, onOpenCart, cartCount }) {
               anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
               transformOrigin={{ vertical: 'top', horizontal: 'right' }}
             >
-			  {(user?.role === 'product_manager' || user?.role === 'sales_manager') && (
+			  {user?.roles?.some(role => ['product_manager', 'sales_manager'].includes(role)) && (
 			  <MenuItem onClick={() => { handleMenuClose(); window.location.href = '/admin'; }}>
 				Admin Interface
 			  </MenuItem>
@@ -173,13 +173,24 @@ function ProductCardItem({ product, onAdd, onView, quantity, onIncrement, onDecr
   return (
     <ProductCard>
       <CardMedia
-        component="img"
-        image={product.image_path}
-        alt={product.name}
-        height={140}
-        onClick={() => onView(product.id)}
-        sx={{ cursor: 'pointer', objectFit: 'contain', backgroundColor: '#fff' }}
-      />
+		  component="img"
+		  image={product.image_path}
+		  alt={product.name}
+		  height={140}
+		  onClick={() => onView(product.id)}
+		  sx={{
+			cursor: 'pointer',
+			objectFit: 'contain',
+			backgroundColor: '#fff',
+			filter: product.stock === 0 ? 'grayscale(100%)' : 'none',
+			opacity: product.stock === 0 ? 0.7 : 1,
+			transition: 'filter 0.3s, opacity 0.3s',
+			'&:hover': {
+			  filter: 'none',
+			  opacity: 1,
+			},
+		  }}
+		/>
       <CardContent>
         <Typography gutterBottom variant="h5">
           {product.name}
@@ -195,22 +206,43 @@ function ProductCardItem({ product, onAdd, onView, quantity, onIncrement, onDecr
         </Typography>
       </CardContent>
       <CardActions>
-        <IconButton size="small" onClick={onDecrement} disabled={quantity <= 1}>
-          <Remove />
-        </IconButton>
-        <InputBase
-          type="number"
-          value={quantity}
-          onChange={e => onQuantityChange(Number(e.target.value))}
-          inputProps={{ min: 1, max: product.stock, style: { width: 40, textAlign: 'center' } }}
-        />
-        <IconButton size="small" onClick={onIncrement} disabled={quantity >= product.stock}>
-          <Add />
-        </IconButton>
-        <Button size="small" variant="contained" onClick={() => onAdd(product, quantity)}>
-          Add to Cart
-        </Button>
-      </CardActions>
+		  {product.stock === 0 ? (
+			// --- Out of Stock Mode ---
+			<Typography
+			  variant="body2"
+			  sx={{
+				backgroundColor: 'warning.main',
+				color: '#000',
+				fontWeight: 'bold',
+				p: 1,
+				borderRadius: 1,
+				width: '100%',
+				textAlign: 'center'
+			  }}
+			>
+			  Out of Stock
+			</Typography>
+		  ) : (
+			// --- Normal Mode ---
+			<>
+			  <IconButton size="small" onClick={onDecrement} disabled={quantity <= 1}>
+				<Remove />
+			  </IconButton>
+			  <InputBase
+				type="number"
+				value={quantity}
+				onChange={e => onQuantityChange(Number(e.target.value))}
+				inputProps={{ min: 1, max: product.stock, style: { width: 40, textAlign: 'center' } }}
+			  />
+			  <IconButton size="small" onClick={onIncrement} disabled={quantity >= product.stock}>
+				<Add />
+			  </IconButton>
+			  <Button size="small" variant="contained" onClick={() => onAdd(product, quantity)}>
+				Add to Cart
+			  </Button>
+			</>
+		  )}
+		</CardActions>
     </ProductCard>
   );
 }

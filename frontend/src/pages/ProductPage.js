@@ -99,12 +99,26 @@ function ProductPage() {
   const [showPending, setShowPending] = useState(false);
   const { user } = useContext(SessionContext);
   const [isWishlisted, setIsWishlisted] = useState(false);
+  const [categories, setCategories] = useState([]);
+
   
   useEffect(() => {
 	  if (!user) {
 		setPendingReview(null);
 	  }
 	}, [user]);
+
+	useEffect(() => {
+	  fetch('/api/categories')
+		.then(res => res.json())
+		.then(setCategories)
+		.catch(console.error);
+	}, []);
+	
+	const getCategoryName = (id) => {
+	  const category = categories.find(cat => cat.id === id);
+	  return category ? category.name : 'Unknown';
+	};
 
 
   useEffect(() => {
@@ -192,31 +206,40 @@ function ProductPage() {
 
 
 	const handleSubmitReview = async () => {
+	  if (pendingReview) {
+		setToastMessage('You already have a pending review. Please wait for approval.');
+		return;
+	  }
+
 	  setSubmitting(true);
 	  try {
 		if (userRating) {
 		  await fetch('/api/ratings', {
-			method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+			method: 'POST',
+			credentials: 'include',
+			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ productId: id, rating: userRating })
 		  });
 		}
 
 		if (userRating && commentText.trim()) {
 		  await fetch('/api/comments', {
-			method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+			method: 'POST',
+			credentials: 'include',
+			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ productId: id, comment_text: commentText })
 		  });
 		  setCommentText('');
 		  setToastMessage('Your comment was submitted for review.');
 
-		  // ✅ New: Refetch your pending comment properly
+		  // ✅ Refetch pending review properly
 		  const pendingRes = await fetch(`/api/pending-comment/${id}`, { credentials: 'include' });
 		  if (pendingRes.ok) {
 			const pendingData = await pendingRes.json();
 			if (pendingData) {
 			  setPendingReview({
 				id: pendingData.comment_id,
-				rating: userRating, // if you store rating too, otherwise can be 0
+				rating: userRating,
 				comment: pendingData.comment_text,
 				date: new Date(pendingData.created_at)
 			  });
@@ -224,7 +247,7 @@ function ProductPage() {
 		  }
 		}
 
-		// Only refresh rating, not comments (since pending is hidden)
+		// Only refresh rating, not comments
 		const newRating = await fetch(`/api/ratings/${id}`).then(r => r.json());
 		setAvgRating(newRating.average_rating);
 
@@ -234,6 +257,7 @@ function ProductPage() {
 		setSubmitting(false);
 	  }
 	};
+
 
 
   if (loading) return <Typography align="center">Loading...</Typography>;
@@ -250,28 +274,119 @@ function ProductPage() {
       <Grid container spacing={4}>
         <Grid item xs={12} md={6}>
           <ImageContainer>
-            <img src={`/${product.image_path}`} alt={product.name} />
-          </ImageContainer>
+		  <Box
+			component="img"
+			src={`/${product.image_path}`}
+			alt={product.name}
+			sx={{
+			  maxWidth: '100%',
+			  borderRadius: 2,
+			  filter: product.stock === 0 ? 'grayscale(100%)' : 'none',
+			  opacity: product.stock === 0 ? 0.7 : 1,
+			  transition: 'filter 0.3s, opacity 0.3s',
+			  '&:hover': {
+				filter: 'none',
+				opacity: 1
+			  }
+			}}
+		  />
+		</ImageContainer>
         </Grid>
         <Grid item xs={12} md={6}>
           <InfoContainer>
-            <Typography variant="h4">{product.name}</Typography>
-            <Typography>{product.description}</Typography>
-            <Typography variant="subtitle1">Category: {product.category}</Typography>
-            <Typography variant="h6" color="primary">${product.price}</Typography>
-            <Typography>Stock: {product.stock}</Typography>
+            <InfoContainer>
+			  <Typography variant="h4">{product.name}</Typography>
+
+			  <Typography>
+				<Box component="span" sx={{ color: product.model ? 'inherit' : 'text.disabled', fontWeight: 'bold' }}>
+				  Model:
+				</Box> {product.model || 'N/A'}
+			  </Typography>
+
+			  <Typography>
+				<Box component="span" sx={{ color: product.serial_number ? 'inherit' : 'text.disabled', fontWeight: 'bold' }}>
+				  Serial Number:
+				</Box> {product.serial_number || 'N/A'}
+			  </Typography>
+
+			  <Typography>
+				<Box component="span" sx={{ color: product.description ? 'inherit' : 'text.disabled', fontWeight: 'bold' }}>
+				  Description:
+				</Box> {product.description || 'N/A'}
+			  </Typography>
+
+			  <Typography>
+				<Box component="span" sx={{ color: getCategoryName(product.category_id) !== 'Unknown' ? 'inherit' : 'text.disabled', fontWeight: 'bold' }}>
+				  Category:
+				</Box> {getCategoryName(product.category_id)}
+			  </Typography>
+
+			  <Typography>
+				<Box component="span" sx={{ fontWeight: 'bold' }}>
+				  Stock:
+				</Box> {product.stock}
+			  </Typography>
+
+			  <Typography>
+				<Box component="span" sx={{ color: product.warranty_status && product.warranty_status !== 'No Warranty' ? 'inherit' : 'text.disabled', fontWeight: 'bold' }}>
+				  Warranty:
+				</Box> {product.warranty_status || 'N/A'}
+			  </Typography>
+
+			  <Typography>
+				<Box component="span" sx={{ color: product.distributor_info ? 'inherit' : 'text.disabled', fontWeight: 'bold' }}>
+				  Distributor:
+				</Box> {product.distributor_info || 'N/A'}
+			  </Typography>
+			  
+			  <Typography variant="h6" color="primary">
+				${Number(product.price).toFixed(2)}
+			  </Typography>
+			</InfoContainer>
+
             <QuantityContainer>
-              <IconButton onClick={handleDecrement} disabled={quantity === 1}><RemoveIcon /></IconButton>
-              <TextField
-                type="number"
-                value={quantity}
-                onChange={e => setQuantity(Math.max(1, Math.min(Number(e.target.value)||1, product.stock)))}
-                inputProps={{ min: 1, max: product.stock, style: { textAlign: 'center', width: 60 } }}
-                size="small"
-              />
-              <IconButton onClick={handleIncrement} disabled={quantity >= product.stock}><AddIcon /></IconButton>
-            </QuantityContainer>
-            <Button variant="contained" onClick={handleAddToCart}>Add to Cart</Button>
+			  <IconButton onClick={handleDecrement} disabled={product.stock === 0 || quantity === 1}>
+				<RemoveIcon />
+			  </IconButton>
+			  <TextField
+				type="number"
+				value={product.stock === 0 ? 0 : quantity}
+				onChange={e => {
+				  if (product.stock > 0) {
+					setQuantity(Math.max(1, Math.min(Number(e.target.value) || 1, product.stock)));
+				  }
+				}}
+				inputProps={{ 
+				  min: product.stock === 0 ? 0 : 1, 
+				  max: product.stock, 
+				  style: { textAlign: 'center', width: 60 }
+				}}
+				size="small"
+				disabled={product.stock === 0}
+			  />
+			  <IconButton onClick={handleIncrement} disabled={product.stock === 0 || quantity >= product.stock}>
+				<AddIcon />
+			  </IconButton>
+			</QuantityContainer>
+            {product.stock === 0 ? (
+			  <Typography
+				variant="body1"
+				sx={{
+				  backgroundColor: 'warning.main',
+				  color: '#000',
+				  fontWeight: 'bold',
+				  p: 1,
+				  borderRadius: 1,
+				  textAlign: 'center'
+				}}
+			  >
+				Out of Stock
+			  </Typography>
+			) : (
+			  <Button variant="contained" onClick={handleAddToCart}>
+				Add to Cart
+			  </Button>
+			)}
 			{user && (
                <FormControlLabel
                  control={<Checkbox checked={isWishlisted} onChange={handleWishlistToggle} />}

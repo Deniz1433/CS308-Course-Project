@@ -3,20 +3,32 @@
 CREATE DATABASE IF NOT EXISTS ecommerce;
 USE ecommerce;
 
+-- Create the categories table
+CREATE TABLE IF NOT EXISTS categories (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(100) NOT NULL UNIQUE
+) ENGINE=InnoDB;
+
 
 -- Create the products table
 CREATE TABLE IF NOT EXISTS products (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(150) NOT NULL,
+  model VARCHAR(100),
+  serial_number VARCHAR(100) UNIQUE,
   description TEXT,
-  category VARCHAR(100) NOT NULL,
+  category_id INT NOT NULL,
   price DECIMAL(10,2) NOT NULL,
   stock INT DEFAULT 0,
+  warranty_status VARCHAR(50) DEFAULT 'No Warranty',
+  distributor_info TEXT,
   popularity INT DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  image_path VARCHAR(255) DEFAULT NULL
+  image_path VARCHAR(255) DEFAULT NULL,
+  FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
+
 
 
 -- Create the users table
@@ -147,18 +159,42 @@ INSERT INTO roles (name) VALUES
 ('product_manager'),
 ('sales_manager');
 
-INSERT INTO products (name, description, category, price, stock, image_path, popularity)
+INSERT INTO categories (name) VALUES
+  ('Electronics'),
+  ('Wearables'),
+  ('Home Appliances');
+
+
+INSERT INTO products (name, model, serial_number, description, category_id, price, stock, warranty_status, distributor_info, image_path, popularity)
 VALUES 
-  ('Laptop Pro', 'A powerful laptop for professionals', 'Electronics', 1299.99, 50, 'product_images/laptop_pro.jpg', 6),
-  ('Wireless Headphones', 'Noise-cancelling over-ear headphones', 'Electronics', 199.99, 100, 'product_images/headphones.jpg', 7),
-  ('Smartwatch X', 'Feature-packed smartwatch with health tracking', 'Wearables', 299.99, 75, 'product_images/smartwatch_x.jpg', 5);
+  -- Electronics
+  ('Laptop Pro', 'LP-2025', 'SN-LP-001', 'A powerful laptop for professionals', 1, 1299.99, 50, '2 Years', 'Distributor Co. - distributor@example.com', 'product_images/laptop_pro.jpg', 6),
+  ('Wireless Headphones', 'WH-NoiseX', 'SN-WH-002', 'Noise-cancelling over-ear headphones', 1, 199.99, 100, '1 Year', 'Sound Distributor - sound@example.com', 'product_images/headphones.jpg', 7),
+  ('Limited Edition Drone', 'Drone-Lite', 'SN-DR-003', 'Ultra-light drone for hobbyists', 1, 899.99, 1, '6 Months', 'FlyHigh Corp - fly@example.com', 'product_images/drone.jpg', 8),
+
+  -- Wearables
+  ('Smartwatch X', 'SW-X2025', 'SN-SW-004', 'Feature-packed smartwatch with health tracking', 2, 299.99, 75, '1 Year', 'WearTech Ltd - wear@example.com', 'product_images/smartwatch_x.jpg', 5),
+  ('Smart Glasses', 'SG-VR', 'SN-SG-005', 'Augmented reality smart glasses', 2, 499.99, 0, '1 Year', 'VisionTech - vision@example.com', 'product_images/smart_glasses.jpg', 4),
+
+  -- Home Appliances (NEW Category)
+  ('Robot Vacuum Cleaner', 'RVC-1000', 'SN-RVC-006', 'Automatic smart vacuum cleaner', 3, 399.99, 30, '2 Years', 'CleanMaster - clean@example.com', 'product_images/robot_vacuum.jpg', 6),
+  ('Air Purifier Max', 'APM-500', 'SN-AP-007', 'HEPA-certified air purifier for clean indoor air', 3, 249.99, 25, '2 Years', 'AirHealth - air@example.com', 'product_images/air_purifier.jpg', 5);
+
+
 
 
 INSERT INTO users (name, email, home_address, password)
 VALUES 
-('Alice Customer', 'alice@example.com', '123 Elm Street', 'customer123'),
-('Bob Manager', 'bob@example.com', '456 Oak Avenue', 'product123'),
-('Charlie Sales', 'charlie@example.com', '789 Pine Road', 'sales123');
+('Alice Customer', 'alice@example.com', '123 Elm Street', '$2a$10$PxQGXXccLlv7gLT5NmMKRO9LlaJvRWHvghsBTnSZgdxhJq4uRLHZa'),
+('Bob Manager', 'bob@example.com', '456 Oak Avenue', '$2a$10$PxQGXXccLlv7gLT5NmMKRO9LlaJvRWHvghsBTnSZgdxhJq4uRLHZa'),
+('Charlie Sales', 'charlie@example.com', '789 Pine Road', '$2a$10$PxQGXXccLlv7gLT5NmMKRO9LlaJvRWHvghsBTnSZgdxhJq4uRLHZa');
+
+INSERT INTO user_roles (user_id, role_id)
+VALUES
+(1, 1),  -- Alice is a customer
+(2, 2),  -- Bob is a product_manager
+(3, 3);  -- Charlie is a sales_manager
+
 
 
 UPDATE comments SET approved = TRUE WHERE approved IS NULL;
@@ -176,11 +212,21 @@ VALUES
   (2, 1, 'Fantastic noise cancellation. Great for flights.', TRUE),
   (2, 3, 'Bass is solid and battery life is more than enough.', TRUE);
 
--- Comments for Smartwatch X (product_id = 3)
+-- Comments for Smartwatch X (product_id = 4)
 INSERT INTO comments (product_id, user_id, comment_text, approved)
 VALUES
-  (3, 2, 'Nice health tracking features, very accurate.', TRUE),
-  (3, 3, 'Love the sleek design and vibrant screen!', TRUE);
+  (4, 2, 'Nice health tracking features, very accurate.', TRUE),
+  (4, 3, 'Love the sleek design and vibrant screen!', TRUE);
+
+-- Comments for Robot Vacuum Cleaner (product_id = 6)
+INSERT INTO comments (product_id, user_id, comment_text, approved)
+VALUES
+  (6, 1, 'Makes cleaning the house effortless. I love the smart mapping.', TRUE);
+
+-- Comments for Air Purifier Max (product_id = 7)
+INSERT INTO comments (product_id, user_id, comment_text, approved)
+VALUES
+  (7, 2, 'Noticeable improvement in air quality. Highly recommended.', TRUE);
 
 -- Ratings for Laptop Pro (product_id = 1)
 INSERT INTO ratings (product_id, user_id, rating)
@@ -194,8 +240,19 @@ VALUES
   (2, 1, 5),  -- Alice
   (2, 3, 4);  -- Charlie
 
--- Ratings for Smartwatch X (product_id = 3)
+-- Ratings for Smartwatch X (product_id = 4)
 INSERT INTO ratings (product_id, user_id, rating)
 VALUES
-  (3, 2, 5),  -- Bob
-  (3, 3, 5);  -- Charlie
+  (4, 2, 5),  -- Bob
+  (4, 3, 5);  -- Charlie
+
+-- Ratings for Robot Vacuum Cleaner (product_id = 6)
+INSERT INTO ratings (product_id, user_id, rating)
+VALUES
+  (6, 1, 5);
+
+-- Ratings for Air Purifier Max (product_id = 7)
+INSERT INTO ratings (product_id, user_id, rating)
+VALUES
+  (7, 2, 4);
+
