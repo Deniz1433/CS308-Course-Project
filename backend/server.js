@@ -488,28 +488,39 @@ app.get("/api/can-review/:productId", async (req, res) => {
 app.post("/api/ratings", async (req, res) => {
   const userId = req.session.user?.id;
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
   const { productId, rating } = req.body;
   if (!productId || rating == null) {
     return res.status(400).json({ error: "Product ID and rating required." });
   }
+
   try {
     const [exist] = await pool.promise().query(
       "SELECT 1 FROM ratings WHERE user_id = ? AND product_id = ?",
       [userId, productId]
     );
+
     if (exist.length) {
-      return res.status(400).json({ error: "You have already rated this product." });
+      // Rating already exists: UPDATE it
+      await pool.promise().query(
+        "UPDATE ratings SET rating = ? WHERE user_id = ? AND product_id = ?",
+        [rating, userId, productId]
+      );
+    } else {
+      // No existing rating: INSERT new one
+      await pool.promise().query(
+        "INSERT INTO ratings (user_id, product_id, rating) VALUES (?,?,?)",
+        [userId, productId, rating]
+      );
     }
-    await pool.promise().query(
-      "INSERT INTO ratings (user_id, product_id, rating) VALUES (?,?,?)",
-      [userId, productId, rating]
-    );
-    res.json({ message: "Rating added successfully." });
+
+    res.json({ message: "Rating submitted successfully." });
   } catch (err) {
     console.error("Post rating error:", err);
     res.status(500).json({ error: "Failed to submit rating." });
   }
 });
+
 
 app.post("/api/comments", async (req, res) => {
   const userId = req.session.user?.id;
