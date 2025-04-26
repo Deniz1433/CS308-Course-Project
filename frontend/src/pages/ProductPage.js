@@ -99,12 +99,26 @@ function ProductPage() {
   const [showPending, setShowPending] = useState(false);
   const { user } = useContext(SessionContext);
   const [isWishlisted, setIsWishlisted] = useState(false);
+  const [categories, setCategories] = useState([]);
+
   
   useEffect(() => {
 	  if (!user) {
 		setPendingReview(null);
 	  }
 	}, [user]);
+
+	useEffect(() => {
+	  fetch('/api/categories')
+		.then(res => res.json())
+		.then(setCategories)
+		.catch(console.error);
+	}, []);
+	
+	const getCategoryName = (id) => {
+	  const category = categories.find(cat => cat.id === id);
+	  return category ? category.name : 'Unknown';
+	};
 
 
   useEffect(() => {
@@ -257,7 +271,7 @@ function ProductPage() {
           <InfoContainer>
             <Typography variant="h4">{product.name}</Typography>
             <Typography>{product.description}</Typography>
-            <Typography variant="subtitle1">Category: {product.category}</Typography>
+            <Typography variant="subtitle1">Category: {getCategoryName(product.category_id)}</Typography>
             <Typography variant="h6" color="primary">${product.price}</Typography>
             <Typography>Stock: {product.stock}</Typography>
             <QuantityContainer>

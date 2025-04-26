@@ -57,6 +57,14 @@ app.get("/api/products/:id", (req, res) => {
   });
 });
 
+app.get("/api/categories", (req, res) => {
+  pool.query("SELECT * FROM categories", (err, results) => {
+    if (err) return res.status(500).json({ error: "Database error" });
+    res.json(results);
+  });
+});
+
+
 app.get("/api/search", (req, res) => {
   const q = req.query.q;
   if (!q) return res.status(400).json({ error: "Missing search query" });
