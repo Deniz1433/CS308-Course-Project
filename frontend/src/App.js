@@ -238,12 +238,13 @@ export const CartProvider = ({ children }) => {
     });
   };
   const removeFromCart = id => setCart(prev => prev.filter(item => item.id !== id));
+  const clearCart = () => setCart([]);
   const updateCartQuantity = (id, quantity) => setCart(prev => prev.map(item =>
     item.id === id ? { ...item, quantity } : item
   ));
 
   return (
-    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateCartQuantity }}>
+    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateCartQuantity, clearCart }}>
       {children}
     </CartContext.Provider>
   );
@@ -251,7 +252,7 @@ export const CartProvider = ({ children }) => {
 
 // 7. ProductListing page
 function ProductListing() {
-  const { cart, addToCart, removeFromCart } = useContext(CartContext);
+  const { cart, addToCart, removeFromCart, clearCart } = useContext(CartContext);
   const { user, logout } = useContext(SessionContext);
   const navigate = useNavigate();
 
@@ -263,7 +264,11 @@ function ProductListing() {
   const [sortAnchorEl, setSortAnchorEl] = useState(null);
   const [quantityMap, setQuantityMap] = useState({});
   const [cartOpen, setCartOpen] = useState(false);
-
+  const handleLogout = async () => {
+    await logout();    // this calls POST /api/logout
+    clearCart();       // wipe out the client-side cart
+     navigate('/login');
+  };
   const openSortMenu = Boolean(sortAnchorEl);
   const handleSortOpen = e => setSortAnchorEl(e.currentTarget);
   const handleSortClose = () => setSortAnchorEl(null);
@@ -316,7 +321,7 @@ function ProductListing() {
 
   return (
     <>
-      <Header user={user} onLogout={logout} onOpenCart={() => setCartOpen(true)} cartCount={cart.reduce((acc, i) => acc + i.quantity, 0)} />
+      <Header user={user} onLogout={handleLogout} onOpenCart={() => setCartOpen(true)} cartCount={cart.reduce((acc, i) => acc + i.quantity, 0)} />
 
       <MainContainer>
 		<Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
