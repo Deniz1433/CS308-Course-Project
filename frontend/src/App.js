@@ -10,7 +10,6 @@ import ProductPage from './pages/ProductPage';
 import Orders from './pages/Orders';
 import ProfilePage from './pages/Profile';
 import AdminInterface from './pages/AdminInterface'; // adjust path if needed
-import Wishlist from './pages/Wishlist';
 
 
 // MUI & Theming Imports
@@ -39,7 +38,6 @@ import Avatar from '@mui/material/Avatar';
 import ListItemText from '@mui/material/ListItemText';
 import { Add, Remove, ShoppingCart, ArrowDropDown, Delete } from '@mui/icons-material';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
-import InvoicePage from './pages/Invoice';
 
 // 1. Theme configuration
 const theme = createTheme({
@@ -128,7 +126,7 @@ function Header({ user, onLogout, onOpenCart, cartCount }) {
         </IconButton>
         {user ? (
           <Box sx={{ ml: 2 }}>
-            <Button color="inherit" onClick={handleMenuOpen} endIcon={<ArrowDropDown />}>
+            <Button color="inherit" onClick={handleMenuOpen} endIcon={<ArrowDropDown />}> 
               {user.name}
             </Button>
             <Menu
@@ -138,14 +136,11 @@ function Header({ user, onLogout, onOpenCart, cartCount }) {
               anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
               transformOrigin={{ vertical: 'top', horizontal: 'right' }}
             >
-              {(user?.role === 'product_manager' || user?.role === 'sales_manager') && (
-                <MenuItem onClick={() => { handleMenuClose(); window.location.href = '/admin'; }}>
-                  Admin Interface
-                </MenuItem>
-              )}
-              <MenuItem onClick={() => { handleMenuClose(); window.location.href = '/wishlist'; }}>
-                My Wishlist
-              </MenuItem>
+			  {(user?.role === 'product_manager' || user?.role === 'sales_manager') && (
+			  <MenuItem onClick={() => { handleMenuClose(); window.location.href = '/admin'; }}>
+				Admin Interface
+			  </MenuItem>
+			  )}
               <MenuItem onClick={() => { handleMenuClose(); window.location.href = '/profile'; }}>
                 My Profile
               </MenuItem>
@@ -274,13 +269,19 @@ function ProductListing() {
   };
 
   useEffect(() => {
-    fetch('/api/products')
-      .then(res => res.json())
-      .then(setProducts)
-      .catch(console.error);
-  }, []);
+	  fetch('/api/products')
+		.then(res => res.json())
+		.then(setProducts)
+		.catch(console.error);
 
-  const categories = [...new Set(products.map(p => p.category))];
+	  fetch('/api/categories')
+		.then(res => res.json())
+		.then(setCategories)
+		.catch(console.error);
+	}, []);
+
+
+  const [categories, setCategories] = useState([]);
 
   const handleQuantityChange = (id, val, stock) => {
     const q = Math.max(1, Math.min(Number(val) || 1, stock));
@@ -292,12 +293,19 @@ function ProductListing() {
   const handleDecrement = id => {
     setQuantityMap(prev => ({ ...prev, [id]: Math.max((prev[id] || 1) - 1, 1) }));
   };
+  
+  const getCategoryName = (category_id) => {
+	  const cat = categories.find(c => c.id === category_id);
+	  return cat ? cat.name : '';
+	};
+
 
   const filtered = products.filter(p => {
-    const q = search.toLowerCase();
-    return (!category || p.category === category) &&
-      (p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q));
-  });
+	 const q = search.toLowerCase();
+	 const catName = getCategoryName(p.category_id);
+	 return (!category || catName === category) &&
+	 (p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q));
+   });
 
   const sorted = [...filtered].sort((a, b) => {
     if (!sortOption) return 0;
@@ -353,7 +361,11 @@ function ProductListing() {
 		</Box>
         <Box sx={{ mb: 2 }}>
           <CategoryButton onClick={() => setCategory(null)}>All Products</CategoryButton>
-          {categories.map(cat => (<CategoryButton key={cat} onClick={() => setCategory(cat)}>{cat}</CategoryButton>))}
+          {categories.map(cat => (
+			  <CategoryButton key={cat.id} onClick={() => setCategory(cat.name)}>
+				{cat.name}
+			  </CategoryButton>
+			))}
         </Box>
         <ProductGrid container spacing={2}>
           {sorted.map(product => (
@@ -408,11 +420,7 @@ function App() {
               <Route path="/product-page/:id" element={<ProductPage />} />
               <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-              <Route path="/wishlist" element={<ProtectedRoute><Wishlist /></ProtectedRoute>} />
-              <Route path="/invoice/:orderId" element={<InvoicePage />} />
-			        <Route path="/admin" element={<AdminInterface />} />
-
-
+			  <Route path="/admin" element={<AdminInterface />} />
             </Routes>
           </Router>
         </CartProvider>

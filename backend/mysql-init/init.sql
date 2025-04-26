@@ -4,19 +4,27 @@ CREATE DATABASE IF NOT EXISTS ecommerce;
 USE ecommerce;
 
 
+-- Create the categories table
+CREATE TABLE IF NOT EXISTS categories (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(100) NOT NULL UNIQUE
+) ENGINE=InnoDB;
+
 -- Create the products table
 CREATE TABLE IF NOT EXISTS products (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(150) NOT NULL,
   description TEXT,
-  category VARCHAR(100) NOT NULL,
+  category_id INT NOT NULL,
   price DECIMAL(10,2) NOT NULL,
   stock INT DEFAULT 0,
   popularity INT DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  image_path VARCHAR(255) DEFAULT NULL
+  image_path VARCHAR(255) DEFAULT NULL,
+  FOREIGN KEY (category_id) REFERENCES categories(id)
 ) ENGINE=InnoDB;
+
 
 
 -- Create the users table
@@ -147,11 +155,17 @@ INSERT INTO roles (name) VALUES
 ('product_manager'),
 ('sales_manager');
 
-INSERT INTO products (name, description, category, price, stock, image_path, popularity)
+INSERT INTO categories (name) VALUES 
+  ('Electronics'),
+  ('Wearables');
+
+
+INSERT INTO products (name, description, category_id, price, stock, image_path, popularity)
 VALUES 
-  ('Laptop Pro', 'A powerful laptop for professionals', 'Electronics', 1299.99, 50, 'product_images/laptop_pro.jpg', 6),
-  ('Wireless Headphones', 'Noise-cancelling over-ear headphones', 'Electronics', 199.99, 100, 'product_images/headphones.jpg', 7),
-  ('Smartwatch X', 'Feature-packed smartwatch with health tracking', 'Wearables', 299.99, 75, 'product_images/smartwatch_x.jpg', 5);
+  ('Laptop Pro', 'A powerful laptop for professionals', 1, 1299.99, 50, 'product_images/laptop_pro.jpg', 6),
+  ('Wireless Headphones', 'Noise-cancelling over-ear headphones', 1, 199.99, 100, 'product_images/headphones.jpg', 7),
+  ('Smartwatch X', 'Feature-packed smartwatch with health tracking', 2, 299.99, 75, 'product_images/smartwatch_x.jpg', 5);
+
 
 
 INSERT INTO users (name, email, home_address, password)
