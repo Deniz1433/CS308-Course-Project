@@ -294,61 +294,54 @@ function ProductPage() {
         </Grid>
         <Grid item xs={12} md={6}>
           <InfoContainer>
-            <Typography variant="h4">{product.name}</Typography>
-            <Typography>{product.description}</Typography>
-            <Typography variant="subtitle1">Category: {getCategoryName(product.category_id)}</Typography>
-            <Typography variant="h6" color="primary">${product.price}</Typography>
-            <Typography>Stock: {product.stock}</Typography>
-            <QuantityContainer>
-			  <IconButton onClick={handleDecrement} disabled={product.stock === 0 || quantity === 1}>
-				<RemoveIcon />
-			  </IconButton>
-			  <TextField
-				type="number"
-				value={product.stock === 0 ? 0 : quantity}
-				onChange={e => {
-				  if (product.stock > 0) {
-					setQuantity(Math.max(1, Math.min(Number(e.target.value) || 1, product.stock)));
-				  }
-				}}
-				inputProps={{ 
-				  min: product.stock === 0 ? 0 : 1, 
-				  max: product.stock, 
-				  style: { textAlign: 'center', width: 60 }
-				}}
-				size="small"
-				disabled={product.stock === 0}
-			  />
-			  <IconButton onClick={handleIncrement} disabled={product.stock === 0 || quantity >= product.stock}>
-				<AddIcon />
-			  </IconButton>
-			</QuantityContainer>
-            {product.stock === 0 ? (
-			  <Typography
-				variant="body1"
-				sx={{
-				  backgroundColor: 'warning.main',
-				  color: '#000',
-				  fontWeight: 'bold',
-				  p: 1,
-				  borderRadius: 1,
-				  textAlign: 'center'
-				}}
-			  >
-				Out of Stock
+			  <Typography variant="h4">{product.name}</Typography>
+
+			  <Typography>
+				<Box component="span" sx={{ color: product.model ? 'inherit' : 'text.disabled', fontWeight: 'bold' }}>
+				  Model:
+				</Box> {product.model || 'N/A'}
 			  </Typography>
-			) : (
-			  <Button variant="contained" onClick={handleAddToCart}>
-				Add to Cart
-			  </Button>
-			)}
-			{user && (
-               <FormControlLabel
-                 control={<Checkbox checked={isWishlisted} onChange={handleWishlistToggle} />}
-                 label="Add to Wishlist"
-               />
-             )}
-          </InfoContainer>
+
+			  <Typography>
+				<Box component="span" sx={{ color: product.serial_number ? 'inherit' : 'text.disabled', fontWeight: 'bold' }}>
+				  Serial Number:
+				</Box> {product.serial_number || 'N/A'}
+			  </Typography>
+
+			  <Typography>
+				<Box component="span" sx={{ color: product.description ? 'inherit' : 'text.disabled', fontWeight: 'bold' }}>
+				  Description:
+				</Box> {product.description || 'N/A'}
+			  </Typography>
+
+			  <Typography>
+				<Box component="span" sx={{ color: getCategoryName(product.category_id) !== 'Unknown' ? 'inherit' : 'text.disabled', fontWeight: 'bold' }}>
+				  Category:
+				</Box> {getCategoryName(product.category_id)}
+			  </Typography>
+
+			  <Typography>
+				<Box component="span" sx={{ fontWeight: 'bold' }}>
+				  Stock:
+				</Box> {product.stock}
+			  </Typography>
+
+			  <Typography>
+				<Box component="span" sx={{ color: product.warranty_status && product.warranty_status !== 'No Warranty' ? 'inherit' : 'text.disabled', fontWeight: 'bold' }}>
+				  Warranty:
+				</Box> {product.warranty_status || 'N/A'}
+			  </Typography>
+
+			  <Typography>
+				<Box component="span" sx={{ color: product.distributor_info ? 'inherit' : 'text.disabled', fontWeight: 'bold' }}>
+				  Distributor:
+				</Box> {product.distributor_info || 'N/A'}
+			  </Typography>
+			  
+			  <Typography variant="h6" color="primary">
+				${Number(product.price).toFixed(2)}
+			  </Typography>
+			</InfoContainer>
         </Grid>
       </Grid>
 	  
