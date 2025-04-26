@@ -378,21 +378,53 @@ function ProductListing() {
       </MainContainer>
 
       <CartDrawer anchor="right" open={cartOpen} onClose={() => setCartOpen(false)}>
-        <Typography variant="h5" gutterBottom>Your Cart</Typography>
-        <Divider />
-        <List>
-          {cart.map(item => (
-            <ListItem key={item.id} secondaryAction={<IconButton edge="end" onClick={() => removeFromCart(item.id)}><Delete /></IconButton>}>
-              <ListItemAvatar><Avatar src={item.image_path} /></ListItemAvatar>
-              <ListItemText primary={item.name} secondary={`$${Number(item.price).toFixed(2)} × ${item.quantity}`} />
-            </ListItem>
-          ))}
-        </List>
-        <Box sx={{ p: 2 }}>
-          <Typography variant="h6">Total: ${total.toFixed(2)}</Typography>
-          <Button fullWidth variant="contained" onClick={handleProceed} sx={{ mt: 1 }}>Proceed to Payment</Button>
-        </Box>
-      </CartDrawer>
+  <Typography variant="h5" gutterBottom>Your Cart</Typography>
+  <Divider />
+
+  <List>
+    {cart.map(item => (
+      <ListItem
+        key={item.id}
+        secondaryAction={
+          <IconButton edge="end" onClick={() => removeFromCart(item.id)}>
+            <Delete />
+          </IconButton>
+        }
+      >
+        <ListItemAvatar>
+          <Avatar src={item.image_path} />
+        </ListItemAvatar>
+        <ListItemText
+          primary={item.name}
+          secondary={`$${Number(item.price).toFixed(2)} × ${item.quantity}`}
+        />
+      </ListItem>
+    ))}
+  </List>
+
+  <Box sx={{ p: 2 }}>
+    <Typography variant="h6">Total: ${total.toFixed(2)}</Typography>
+    <Button
+      fullWidth
+      variant="contained"
+      onClick={handleProceed}
+      disabled={cart.length === 0}
+      sx={{
+        mt: 1,
+        // your normal button colors:
+        backgroundColor: '#1976d2',
+        '&:hover': { backgroundColor: '#115293' },
+        // override disabled styling:
+        '&.Mui-disabled': {
+          backgroundColor: 'rgba(0,0,0,0.12)',
+          color: 'rgba(0,0,0,0.26)',
+        },
+      }}
+    >
+      PROCEED TO PAYMENT
+    </Button>
+  </Box>
+</CartDrawer>
     </>
   );
 }

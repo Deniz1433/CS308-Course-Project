@@ -16,7 +16,6 @@ import {
 
 export default function Payment() {
   const { cart, clearCart } = useContext(CartContext);
-  // now pulling both user AND loading
   const { user, loading: sessionLoading } = useContext(SessionContext);
   const navigate = useNavigate();
 
@@ -26,12 +25,19 @@ export default function Payment() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // only redirect once sessionLoading is false AND user is null
+  // Redirect to login if not authenticated
   useEffect(() => {
     if (!sessionLoading && !user) {
       navigate('/login', { replace: true, state: { from: '/payment' } });
     }
   }, [sessionLoading, user, navigate]);
+
+  // 1️⃣ redirect if cart is empty (once we know login state)
+  useEffect(() => {
+    if (!sessionLoading && user && cart.length === 0) {
+      navigate('/', { replace: true });
+    }
+  }, [sessionLoading, user, cart, navigate]);
 
   // show a spinner while we're checking login
   if (sessionLoading) {
@@ -69,7 +75,6 @@ export default function Payment() {
       }
 
       const { orderId } = data;
-
       clearCart?.();
       navigate(`/invoice/${orderId}`);
     } catch (err) {
@@ -150,7 +155,7 @@ export default function Payment() {
               backgroundColor: '#d17b00',
               '&:hover': { backgroundColor: '#bf6900' }
             }}
-            disabled={loading}
+            disabled={loading || cart.length === 0}
           >
             {loading ? <CircularProgress size={24} sx={{ color: '#fff' }} /> : 'Pay & Email Invoice'}
           </Button>
