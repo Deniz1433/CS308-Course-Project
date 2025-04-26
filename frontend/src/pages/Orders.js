@@ -26,9 +26,8 @@ const Orders = () => {
 
     const fetchOrders = async () => {
       try {
-        fetch('http://localhost:5000/api/orders', {
-          method: 'GET',
-          credentials: 'include'
+        const response = await fetch("http://localhost:5000/api/orders", {
+          credentials: "include",
         });
 
         if (!response.ok) {

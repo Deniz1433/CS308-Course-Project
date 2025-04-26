@@ -223,6 +223,45 @@ app.post("/api/payment", async (req, res) => {
     }
   })();
 });
+app.get("/api/orders", async (req, res) => {
+  const userId = req.session.user?.id;
+  if (!userId) return res.status(401).json({ error: "Not logged in" });
+
+  try {
+    // 1) Select the real date and status
+    const [orders] = await pool.promise().query(
+      `SELECT
+         o.id          AS order_id,
+         o.order_date  AS order_date,
+         o.status      AS status
+       FROM orders o
+       WHERE o.user_id = ?
+       ORDER BY o.order_date DESC`,
+      [userId]
+    );
+
+    // 2) Fetch items for each order
+    for (let order of orders) {
+      const [items] = await pool.promise().query(
+        `SELECT
+           oi.product_id,
+           p.name,
+           oi.quantity,
+           oi.price_at_time
+         FROM order_items oi
+         JOIN products p ON p.id = oi.product_id
+         WHERE oi.order_id = ?`,
+        [order.order_id]
+      );
+      order.items = items;
+    }
+
+    res.json(orders);
+  } catch (err) {
+    console.error("Fetch orders error:", err);
+    res.status(500).json({ error: "Failed to fetch orders." });
+  }
+});
 
 app.get("/api/invoice/:orderId", (req, res) => {
   const file = path.join(invoicesDir, `invoice_${req.params.orderId}.pdf`);
