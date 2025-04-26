@@ -150,7 +150,7 @@ app.get("/api/session", (req, res) => {
   res.status(401).json({ error: "Not logged in" });
 });
 
-// ----- ORDER & INVOICE -----
+
 
 app.post("/api/payment", async (req, res) => {
   const { cardNumber, expiry, cvv, cart } = req.body;
@@ -306,15 +306,28 @@ app.post('/api/invoice/:orderId/email', async (req, res) => {
 
 // ----- COMMENT & RATING ROUTES -----
 
+// 2) Fetch approved comments (with rating)
 app.get("/api/comments/:productId", async (req, res) => {
+  const productId = req.params.productId;
   try {
     const [rows] = await pool.promise().query(
-      `SELECT c.id AS comment_id, c.user_id, c.comment_text, c.created_at, u.name
+      `SELECT
+         c.id           AS comment_id,
+         c.user_id,
+         c.comment_text,
+         c.created_at,
+         u.name,
+         r.rating
        FROM comments c
-       JOIN users u ON u.id = c.user_id
-       WHERE c.product_id = ? AND c.approved = TRUE
+       JOIN users u
+         ON u.id = c.user_id
+       LEFT JOIN ratings r
+         ON r.user_id = c.user_id
+        AND r.product_id = c.product_id
+       WHERE c.product_id = ?
+         AND c.approved = TRUE
        ORDER BY c.created_at DESC`,
-      [req.params.productId]
+      [productId]
     );
     res.json(rows);
   } catch (err) {
@@ -323,16 +336,30 @@ app.get("/api/comments/:productId", async (req, res) => {
   }
 });
 
+
+// 3) Fetch the single pending comment (with rating)
 app.get("/api/pending-comment/:productId", async (req, res) => {
-  const userId = req.session.user?.id;
+  const productId = req.params.productId;
+  const userId    = req.session.user?.id;
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
   try {
     const [rows] = await pool.promise().query(
-      `SELECT id AS comment_id, comment_text, created_at
-       FROM comments
-       WHERE product_id = ? AND user_id = ? AND approved = FALSE
-       ORDER BY created_at DESC LIMIT 1`,
-      [req.params.productId, userId]
+      `SELECT
+         c.id           AS comment_id,
+         c.comment_text,
+         c.created_at,
+         r.rating
+       FROM comments c
+       LEFT JOIN ratings r
+         ON r.user_id = c.user_id
+        AND r.product_id = c.product_id
+       WHERE c.product_id = ?
+         AND c.user_id    = ?
+         AND c.approved   = FALSE
+       ORDER BY c.created_at DESC
+       LIMIT 1`,
+      [productId, userId]
     );
     res.json(rows[0] || null);
   } catch (err) {
@@ -340,6 +367,7 @@ app.get("/api/pending-comment/:productId", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch pending comment" });
   }
 });
+
 
 app.delete("/api/delete-comment/:commentId", async (req, res) => {
   const userId = req.session.user?.id;

@@ -137,8 +137,8 @@ function ProductPage() {
 		  const pendingData = await pendingRes.json();
 		  if (pendingData) {
 			setPendingReview({
-			  id: pendingData.comment_id, // store comment id
-			  rating: userRating, // might not be available unless you store it in database too, otherwise just 0
+			  id: pendingData.comment_id,
+			  rating: pendingData.rating,
 			  comment: pendingData.comment_text,
 			  date: new Date(pendingData.created_at)
 			});
@@ -322,6 +322,7 @@ function ProductPage() {
 					  </Button>
 					)}
 				</Box>
+				<Rating value={c.rating} precision={0.5} readOnly sx={{ mb: 1 }} />
 				<Typography variant="body1">{c.comment_text}</Typography>
 				<Divider sx={{ my: 1 }} />
 			  </li>
