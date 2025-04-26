@@ -35,7 +35,8 @@ export const SessionProvider = ({ children }) => {
     localStorage.setItem('user', JSON.stringify(userData));
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await fetch('/api/logout', { method: 'POST', credentials: 'include' });
     setUser(null);
     localStorage.removeItem('user');
   };
