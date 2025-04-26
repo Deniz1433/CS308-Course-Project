@@ -10,6 +10,7 @@ import ProductPage from './pages/ProductPage';
 import Orders from './pages/Orders';
 import ProfilePage from './pages/Profile';
 import AdminInterface from './pages/AdminInterface'; // adjust path if needed
+import Wishlist from './pages/Wishlist';
 
 
 // MUI & Theming Imports
@@ -148,6 +149,9 @@ function Header({ user, onLogout, onOpenCart, cartCount }) {
               <MenuItem onClick={() => { handleMenuClose(); window.location.href = '/orders'; }}>
                 My Orders
               </MenuItem>
+			  <MenuItem onClick={() => { handleMenuClose(); window.location.href = '/wishlist'; }}>
+                 My Wishlist
+               </MenuItem>
               <Divider />
               <MenuItem onClick={() => { handleMenuClose(); onLogout(); }}>
                 Logout
@@ -406,6 +410,7 @@ function App() {
               <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
               <Route path="/invoice/:orderId" element={<InvoicePage />} />
 			  <Route path="/admin" element={<AdminInterface />} />
+			  <Route path="/wishlist" element={<ProtectedRoute><Wishlist /></ProtectedRoute>} />
             </Routes>
           </Router>
         </CartProvider>

@@ -2,14 +2,10 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { styled } from '@mui/material/styles';
-import Box from '@mui/material/Box';
-import Grid from '@mui/material/Grid';
-import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
-import IconButton from '@mui/material/IconButton';
-import TextField from '@mui/material/TextField';
-import Divider from '@mui/material/Divider';
-import Rating from '@mui/material/Rating';
+import {
+   Box, Grid, Typography, Button, IconButton, TextField, Divider, Rating,
+   Checkbox, FormControlLabel
+ } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
@@ -102,6 +98,7 @@ function ProductPage() {
   const [pendingReview, setPendingReview] = useState(null);
   const [showPending, setShowPending] = useState(false);
   const { user } = useContext(SessionContext);
+  const [isWishlisted, setIsWishlisted] = useState(false);
   
   useEffect(() => {
 	  if (!user) {
@@ -113,12 +110,13 @@ function ProductPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [prodRes, commRes, rateRes, canRes, pendingRes] = await Promise.all([
+        const [prodRes, commRes, rateRes, canRes, pendingRes, wishlistRes] = await Promise.all([
 		  fetch(`/api/products/${id}`),
 		  fetch(`/api/comments/${id}`),
 		  fetch(`/api/ratings/${id}`),
 		  fetch(`/api/can-review/${id}`, { credentials: 'include' }),
 		  fetch(`/api/pending-comment/${id}`, { credentials: 'include' }),
+		  fetch('/api/wishlist', { credentials: 'include' }),
 		]);
         if (!prodRes.ok) throw new Error(`Failed to load product (${prodRes.status})`);
         const prodData = await prodRes.json();
@@ -144,6 +142,10 @@ function ProductPage() {
 			});
 		  }
 		}
+		if (wishlistRes.ok) {
+           const wishlistItems = await wishlistRes.json();
+           setIsWishlisted(wishlistItems.some(p => p.id === prodData.id));
+         }
       } catch (err) {
         setError(err.message);
       } finally {
@@ -151,12 +153,25 @@ function ProductPage() {
       }
     }
     loadData();
-  }, [id]);
+  }, [id, user]);
 
   const handleGoBack = () => navigate('/');
   const handleIncrement = () => product && setQuantity(q => Math.min(q + 1, product.stock));
   const handleDecrement = () => setQuantity(q => Math.max(q - 1, 1));
   const handleAddToCart = () => product && addToCart(product, quantity);
+  const handleWishlistToggle = async (e) => {
+     const want = e.target.checked;
+     try {
+       if (want) {
+         await fetch('/api/wishlist', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ productId: product.id }) });
+       } else {
+         await fetch(`/api/wishlist/${product.id}`, { method: 'DELETE', credentials: 'include' });
+       }
+       setIsWishlisted(want);
+     } catch (err) {
+       console.error('Wishlist error:', err);
+     }
+   };
   async function handleDeleteComment(commentId) {
 	  try {
 		await fetch(`/api/delete-comment/${commentId}`, { method: 'DELETE', credentials: 'include' });
@@ -257,6 +272,12 @@ function ProductPage() {
               <IconButton onClick={handleIncrement} disabled={quantity >= product.stock}><AddIcon /></IconButton>
             </QuantityContainer>
             <Button variant="contained" onClick={handleAddToCart}>Add to Cart</Button>
+			{user && (
+               <FormControlLabel
+                 control={<Checkbox checked={isWishlisted} onChange={handleWishlistToggle} />}
+                 label="Add to Wishlist"
+               />
+             )}
           </InfoContainer>
         </Grid>
       </Grid>
