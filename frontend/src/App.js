@@ -147,6 +147,9 @@ function Header({ user, onLogout, onOpenCart, cartCount }) {
               <MenuItem onClick={() => { handleMenuClose(); window.location.href = '/orders'; }}>
                 My Orders
               </MenuItem>
+			  <MenuItem onClick={() => { handleMenuClose(); window.location.href = '/wishlist'; }}>
+                 My Wishlist
+               </MenuItem>
               <Divider />
               <MenuItem onClick={() => { handleMenuClose(); onLogout(); }}>
                 Logout
@@ -420,7 +423,9 @@ function App() {
               <Route path="/product-page/:id" element={<ProductPage />} />
               <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-			  <Route path="/admin" element={<AdminInterface />} />
+              <Route path="/invoice/:orderId" element={<InvoicePage />} />
+			        <Route path="/admin" element={<AdminInterface />} />
+			        <Route path="/wishlist" element={<ProtectedRoute><Wishlist /></ProtectedRoute>} />
             </Routes>
           </Router>
         </CartProvider>
