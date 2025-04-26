@@ -185,9 +185,16 @@ VALUES
 
 INSERT INTO users (name, email, home_address, password)
 VALUES 
-('Alice Customer', 'alice@example.com', '123 Elm Street', 'customer123'),
-('Bob Manager', 'bob@example.com', '456 Oak Avenue', 'product123'),
-('Charlie Sales', 'charlie@example.com', '789 Pine Road', 'sales123');
+('Alice Customer', 'alice@example.com', '123 Elm Street', '$2a$10$PxQGXXccLlv7gLT5NmMKRO9LlaJvRWHvghsBTnSZgdxhJq4uRLHZa'),
+('Bob Manager', 'bob@example.com', '456 Oak Avenue', '$2a$10$PxQGXXccLlv7gLT5NmMKRO9LlaJvRWHvghsBTnSZgdxhJq4uRLHZa'),
+('Charlie Sales', 'charlie@example.com', '789 Pine Road', '$2a$10$PxQGXXccLlv7gLT5NmMKRO9LlaJvRWHvghsBTnSZgdxhJq4uRLHZa');
+
+INSERT INTO user_roles (user_id, role_id)
+VALUES
+(1, 1),  -- Alice is a customer
+(2, 2),  -- Bob is a product_manager
+(3, 3);  -- Charlie is a sales_manager
+
 
 
 UPDATE comments SET approved = TRUE WHERE approved IS NULL;
