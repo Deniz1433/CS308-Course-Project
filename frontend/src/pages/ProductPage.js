@@ -264,8 +264,23 @@ function ProductPage() {
       <Grid container spacing={4}>
         <Grid item xs={12} md={6}>
           <ImageContainer>
-            <img src={`/${product.image_path}`} alt={product.name} />
-          </ImageContainer>
+		  <Box
+			component="img"
+			src={`/${product.image_path}`}
+			alt={product.name}
+			sx={{
+			  maxWidth: '100%',
+			  borderRadius: 2,
+			  filter: product.stock === 0 ? 'grayscale(100%)' : 'none',
+			  opacity: product.stock === 0 ? 0.7 : 1,
+			  transition: 'filter 0.3s, opacity 0.3s',
+			  '&:hover': {
+				filter: 'none',
+				opacity: 1
+			  }
+			}}
+		  />
+		</ImageContainer>
         </Grid>
         <Grid item xs={12} md={6}>
           <InfoContainer>
@@ -275,17 +290,48 @@ function ProductPage() {
             <Typography variant="h6" color="primary">${product.price}</Typography>
             <Typography>Stock: {product.stock}</Typography>
             <QuantityContainer>
-              <IconButton onClick={handleDecrement} disabled={quantity === 1}><RemoveIcon /></IconButton>
-              <TextField
-                type="number"
-                value={quantity}
-                onChange={e => setQuantity(Math.max(1, Math.min(Number(e.target.value)||1, product.stock)))}
-                inputProps={{ min: 1, max: product.stock, style: { textAlign: 'center', width: 60 } }}
-                size="small"
-              />
-              <IconButton onClick={handleIncrement} disabled={quantity >= product.stock}><AddIcon /></IconButton>
-            </QuantityContainer>
-            <Button variant="contained" onClick={handleAddToCart}>Add to Cart</Button>
+			  <IconButton onClick={handleDecrement} disabled={product.stock === 0 || quantity === 1}>
+				<RemoveIcon />
+			  </IconButton>
+			  <TextField
+				type="number"
+				value={product.stock === 0 ? 0 : quantity}
+				onChange={e => {
+				  if (product.stock > 0) {
+					setQuantity(Math.max(1, Math.min(Number(e.target.value) || 1, product.stock)));
+				  }
+				}}
+				inputProps={{ 
+				  min: product.stock === 0 ? 0 : 1, 
+				  max: product.stock, 
+				  style: { textAlign: 'center', width: 60 }
+				}}
+				size="small"
+				disabled={product.stock === 0}
+			  />
+			  <IconButton onClick={handleIncrement} disabled={product.stock === 0 || quantity >= product.stock}>
+				<AddIcon />
+			  </IconButton>
+			</QuantityContainer>
+            {product.stock === 0 ? (
+			  <Typography
+				variant="body1"
+				sx={{
+				  backgroundColor: 'warning.main',
+				  color: '#000',
+				  fontWeight: 'bold',
+				  p: 1,
+				  borderRadius: 1,
+				  textAlign: 'center'
+				}}
+			  >
+				Out of Stock
+			  </Typography>
+			) : (
+			  <Button variant="contained" onClick={handleAddToCart}>
+				Add to Cart
+			  </Button>
+			)}
 			{user && (
                <FormControlLabel
                  control={<Checkbox checked={isWishlisted} onChange={handleWishlistToggle} />}
