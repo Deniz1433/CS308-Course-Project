@@ -1,18 +1,30 @@
-const express = require("express");
-const mysql = require("mysql2");
-const bcrypt = require("bcryptjs");
-const cors = require("cors");
-const backendSession = require('./sessionmanager');
+// server.js
 require("dotenv").config();
+const express     = require("express");
+const mysql       = require("mysql2");
+const bcrypt      = require("bcryptjs");
+const cors        = require("cors");
+const fs          = require("fs");
+const path        = require("path");
+const Mailgun     = require("mailgun-js");
+const generateInvoice = require("./generateInvoice");
+const backendSession   = require("./sessionmanager");
 
 const app = express();
 const port = 5000;
 
-app.use('/product_images', express.static('product_images'));
-app.use(cors({
-  origin: 'http://localhost:3000',
-  credentials: true
-}));
+// Mailgun client setup
+const mg = Mailgun({
+  apiKey: process.env.MAILGUN_API_KEY,
+  domain: process.env.MAILGUN_DOMAIN
+});
+
+// Ensure invoices directory exists
+const invoicesDir = path.join(__dirname, "invoices");
+if (!fs.existsSync(invoicesDir)) fs.mkdirSync(invoicesDir);
+
+app.use("/product_images", express.static("product_images"));
+app.use(cors({ origin: "http://localhost:3000", credentials: true }));
 app.use(express.json());
 app.use(backendSession);
 
@@ -28,42 +40,35 @@ const pool = mysql.createPool({
 
 // ----- PRODUCT ROUTES -----
 
-// Get all products
-app.get('/api/products', (req, res) => {
-  const query = 'SELECT * FROM products';
-  pool.query(query, (error, results) => {
-    if (error) return res.status(500).json({ error: 'Database error' });
+app.get("/api/products", (req, res) => {
+  pool.query("SELECT * FROM products", (err, results) => {
+    if (err) return res.status(500).json({ error: "Database error" });
     res.json(results);
   });
 });
 
-// Get single product
-app.get('/api/products/:id', (req, res) => {
-  const productId = req.params.id;
-  if (isNaN(productId)) {
-    return res.status(400).json({ error: 'Invalid product ID' });
-  }
-  const query = 'SELECT * FROM products WHERE id = ?';
-  pool.query(query, [productId], (error, results) => {
-    if (error) return res.status(500).json({ error: 'Database error' });
-    if (results.length === 0) return res.status(404).json({ error: 'Product not found' });
+app.get("/api/products/:id", (req, res) => {
+  const id = Number(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ error: "Invalid product ID" });
+  pool.query("SELECT * FROM products WHERE id = ?", [id], (err, results) => {
+    if (err) return res.status(500).json({ error: "Database error" });
+    if (results.length === 0) return res.status(404).json({ error: "Product not found" });
     res.json(results[0]);
   });
 });
 
-// Search products
-app.get('/api/search', (req, res) => {
-  const { q } = req.query;
+app.get("/api/search", (req, res) => {
+  const q = req.query.q;
   if (!q) return res.status(400).json({ error: "Missing search query" });
-  const searchQuery = `%${q.toLowerCase()}%`;
+  const like = `%${q.toLowerCase()}%`;
   const sql = `
-    SELECT * FROM products 
-    WHERE LOWER(name) LIKE ? 
-      OR LOWER(category) LIKE ? 
-      OR LOWER(description) LIKE ?
+    SELECT * FROM products
+     WHERE LOWER(name) LIKE ?
+       OR LOWER(category) LIKE ?
+       OR LOWER(description) LIKE ?
   `;
-  pool.query(sql, [searchQuery, searchQuery, searchQuery], (error, results) => {
-    if (error) return res.status(500).json({ error: "Database error" });
+  pool.query(sql, [like, like, like], (err, results) => {
+    if (err) return res.status(500).json({ error: "Database error" });
     if (results.length === 0) return res.status(404).json({ message: "No products found" });
     res.json(results);
   });
@@ -71,441 +76,389 @@ app.get('/api/search', (req, res) => {
 
 // ----- AUTH ROUTES -----
 
-// Register
 app.post("/api/register", async (req, res) => {
   const { name, email, password, home_address = null } = req.body;
   if (!name || !email || !password) {
     return res.status(400).json({ error: "Name, Email, and Password are required" });
   }
   try {
-    const [existingUser] = await pool.promise().query("SELECT id FROM users WHERE email = ?", [email]);
-    if (existingUser.length > 0) {
-      return res.status(400).json({ error: "Email is already registered" });
-    }
-    const hashedPassword = bcrypt.hashSync(password, 10);
-    const [result] = await pool.promise().query(
-      "INSERT INTO users (name, email, home_address, password) VALUES (?, ?, ?, ?)",
-      [name, email, home_address, hashedPassword]
-    );
+    const [existing] = await pool.promise().query("SELECT id FROM users WHERE email = ?", [email]);
+    if (existing.length) return res.status(400).json({ error: "Email already registered" });
 
+    const hashed = bcrypt.hashSync(password, 10);
+    const [result] = await pool
+      .promise()
+      .query("INSERT INTO users (name,email,home_address,password) VALUES (?,?,?,?)",
+             [name, email, home_address, hashed]);
     const userId = result.insertId;
-    const [[{ id: customerRoleId }]] = await pool.promise().query(
-      "SELECT id FROM roles WHERE name = 'customer'"
-    );
-    await pool.promise().query(
-      "INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)",
-      [userId, customerRoleId]
-    );
+
+    const [[{ id: roleId }]] = await pool
+      .promise()
+      .query("SELECT id FROM roles WHERE name = 'customer'");
+    await pool
+      .promise()
+      .query("INSERT INTO user_roles (user_id,role_id) VALUES (?,?)", [userId, roleId]);
 
     res.status(201).json({ message: "User registered successfully" });
-  } catch (error) {
-    console.error("Registration error:", error);
+  } catch (err) {
+    console.error("Registration error:", err);
     res.status(500).json({ error: "Server error" });
   }
 });
 
-// Login
 app.post("/api/login", async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: "All fields are required" });
 
   try {
     const [users] = await pool.promise().query("SELECT * FROM users WHERE email = ?", [email]);
-    if (users.length === 0) return res.status(401).json({ error: "Invalid email or password" });
-
+    if (!users.length || !bcrypt.compareSync(password, users[0].password)) {
+      return res.status(401).json({ error: "Invalid email or password" });
+    }
     const user = users[0];
-    const isValidPassword = bcrypt.compareSync(password, user.password);
-    if (!isValidPassword) return res.status(401).json({ error: "Invalid email or password" });
+    const [roles] = await pool
+      .promise()
+      .query(
+        `SELECT r.name FROM roles r
+         JOIN user_roles ur ON ur.role_id = r.id
+         WHERE ur.user_id = ?`,
+        [user.id]
+      );
 
-    const [roleRows] = await pool.promise().query(
-      `SELECT r.name FROM roles r
-       JOIN user_roles ur ON ur.role_id = r.id
-       WHERE ur.user_id = ?`,
-      [user.id]
-    );
-    const roles = roleRows.map(r => r.name);
-
-    req.session.user = { id: user.id, name: user.name, email: user.email, roles };
-
-    res.status(200).json({ message: "Login successful", user: req.session.user });
-  } catch (error) {
-    console.error("Login error:", error);
+    req.session.user = {
+      id:    user.id,
+      name:  user.name,
+      email: user.email,
+      roles: roles.map(r => r.name),
+    };
+    res.json({ message: "Login successful", user: req.session.user });
+  } catch (err) {
+    console.error("Login error:", err);
     res.status(500).json({ error: "Server error" });
   }
 });
 
-// Check session
-app.get('/api/session', (req, res) => {
-  if (req.session.user) res.json({ user: req.session.user });
-  else res.status(401).json({ error: 'Not logged in' });
+app.post("/api/logout", (req, res) => {
+  req.session.destroy(err => {
+    if (err) return res.status(500).end();
+    res.clearCookie("sid").sendStatus(200);
+  });
 });
 
-// ----- ORDER ROUTES -----
+app.get("/api/session", (req, res) => {
+  if (req.session.user) return res.json({ user: req.session.user });
+  res.status(401).json({ error: "Not logged in" });
+});
 
-// Place order
-app.post('/api/payment', async (req, res) => {
-  const { cardNumber, expiry, cvv, cart, userId } = req.body;
-  if (!cart || !Array.isArray(cart) || cart.length === 0) {
+// ----- ORDER & INVOICE -----
+
+app.post("/api/payment", async (req, res) => {
+  const { cardNumber, expiry, cvv, cart } = req.body;
+  const userId = req.session.user?.id;
+  if (!userId) return res.status(401).json({ error: "Not logged in." });
+  if (!Array.isArray(cart) || !cart.length) {
     return res.status(400).json({ error: "Cart is empty or invalid." });
   }
-  if (!userId) {
-    return res.status(400).json({ error: "User ID is required." });
+  if (cardNumber === "0000000000000000") {
+    return res.status(400).json({ message: "Payment declined: Invalid card." });
   }
 
+  let orderId;
   try {
-    if (cardNumber === '0000000000000000') {
-      return res.status(400).json({ message: 'Payment declined: Invalid card.' });
-    }
+    const conn = await pool.promise().getConnection();
+    await conn.beginTransaction();
 
-    const connection = await pool.promise().getConnection();
-    try {
-      await connection.beginTransaction();
+    const [orderRes] = await conn.query("INSERT INTO orders (user_id) VALUES (?)", [userId]);
+    orderId = orderRes.insertId;
 
-      const [orderResult] = await connection.query(
-        "INSERT INTO orders (user_id) VALUES (?)",
-        [userId]
-      );
-      const orderId = orderResult.insertId;
-
-      for (const item of cart) {
-        const [productRows] = await connection.query(
-          "SELECT stock, price FROM products WHERE id = ?",
-          [item.productId]
-        );
-        const product = productRows[0];
-        if (!product) throw new Error(`Product ID ${item.productId} not found.`);
-        if (product.stock < item.quantity) throw new Error(`Not enough stock for product ID ${item.productId}.`);
-
-        const newStock = product.stock - item.quantity;
-
-        await connection.query(
-          "UPDATE products SET stock = ? WHERE id = ?",
-          [newStock, item.productId]
-        );
-
-        await connection.query(
-          "INSERT INTO order_items (order_id, product_id, quantity, price_at_time) VALUES (?, ?, ?, ?)",
-          [orderId, item.productId, item.quantity, product.price]
-        );
+    for (const item of cart) {
+      const [[prod]] = await conn.query("SELECT stock,price FROM products WHERE id = ?", [item.id]);
+      if (!prod || prod.stock < item.quantity) {
+        throw new Error(`Invalid stock for product ${item.id}`);
       }
-
-      await connection.commit();
-      connection.release();
-
-      res.status(200).json({ message: "Order placed successfully", orderId });
-    } catch (err) {
-      await connection.rollback();
-      connection.release();
-      console.error("Order creation error:", err);
-      res.status(500).json({ error: "Failed to place order." });
-    }
-  } catch (error) {
-    console.error("Payment error:", error);
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-// Get user's orders
-app.get('/api/orders', async (req, res) => {
-  if (!req.session.user?.id) return res.status(401).json({ error: 'Unauthorized' });
-
-  const userId = req.session.user.id;
-
-  try {
-    const [orders] = await pool.promise().query(
-      'SELECT * FROM orders WHERE user_id = ? ORDER BY order_date DESC',
-      [userId]
-    );
-
-    const detailedOrders = await Promise.all(
-      orders.map(async (order) => {
-        const [items] = await pool.promise().query(
-          `SELECT oi.product_id, p.name, oi.quantity, oi.price_at_time 
-           FROM order_items oi
-           JOIN products p ON oi.product_id = p.id
-           WHERE oi.order_id = ?`,
-          [order.id]
-        );
-
-        return {
-          order_id: order.id,
-          order_date: order.order_date,
-          status: order.status,
-          items,
-        };
-      })
-    );
-
-    res.json(detailedOrders);
-  } catch (err) {
-    console.error('Error fetching orders:', err);
-    res.status(500).json({ error: 'Failed to fetch orders' });
-  }
-});
-
-// ----- COMMENT AND RATING ROUTES -----
-
-// New: Get approved comments
-app.get('/api/comments/:productId', async (req, res) => {
-  const { productId } = req.params;
-  try {
-    const [rows] = await pool.promise().query(
-      `SELECT c.id AS comment_id, c.user_id, c.comment_text, c.created_at, u.name
-       FROM comments c
-       JOIN users u ON c.user_id = u.id
-       WHERE c.product_id = ?
-         AND c.approved = TRUE
-       ORDER BY c.created_at DESC`,
-      [productId]
-    );
-    res.json(rows);
-  } catch (err) {
-    console.error('Error fetching comments:', err);
-    res.status(500).json({ error: 'Failed to fetch comments' });
-  }
-});
-
-// Get the logged-in user's unapproved comment for a specific product
-app.get('/api/pending-comment/:productId', async (req, res) => {
-  if (!req.session.user?.id) return res.status(401).json({ error: 'Unauthorized' });
-
-  const { productId } = req.params;
-  const userId = req.session.user.id;
-
-  try {
-    const [rows] = await pool.promise().query(
-      `SELECT id AS comment_id, comment_text, created_at
-       FROM comments
-       WHERE product_id = ?
-         AND user_id = ?
-         AND approved = FALSE
-       ORDER BY created_at DESC
-       LIMIT 1`,
-      [productId, userId]
-    );
-
-    if (rows.length > 0) {
-      res.json(rows[0]);
-    } else {
-      res.json(null);
-    }
-  } catch (err) {
-    console.error('Error fetching pending comment:', err);
-    res.status(500).json({ error: 'Failed to fetch pending comment' });
-  }
-});
-
-// Delete a comment (approved or unapproved) by its ID, and delete the associated rating
-app.delete('/api/delete-comment/:commentId', async (req, res) => {
-  if (!req.session.user?.id) return res.status(401).json({ error: 'Unauthorized' });
-
-  const { commentId } = req.params;
-  const userId = req.session.user.id;
-
-  try {
-    // First find the comment to get product_id
-    const [commentRows] = await pool.promise().query(
-      `SELECT product_id FROM comments WHERE id = ? AND user_id = ?`,
-      [commentId, userId]
-    );
-
-    if (commentRows.length === 0) {
-      return res.status(404).json({ error: 'Comment not found or not authorized.' });
+      await conn.query("UPDATE products SET stock = ? WHERE id = ?", [prod.stock - item.quantity, item.id]);
+      await conn.query(
+        "INSERT INTO order_items (order_id,product_id,quantity,price_at_time) VALUES (?,?,?,?)",
+        [orderId, item.id, item.quantity, prod.price]
+      );
     }
 
-    const productId = commentRows[0].product_id;
-
-    // Delete the comment
-    await pool.promise().query(
-      `DELETE FROM comments WHERE id = ? AND user_id = ?`,
-      [commentId, userId]
-    );
-
-    // Delete the rating for that product and user
-    await pool.promise().query(
-      `DELETE FROM ratings WHERE product_id = ? AND user_id = ?`,
-      [productId, userId]
-    );
-
-    res.json({ message: 'Comment and rating deleted successfully.' });
+    await conn.commit();
+    conn.release();
   } catch (err) {
-    console.error('Error deleting comment and rating:', err);
-    res.status(500).json({ error: 'Failed to delete comment and rating.' });
+    console.error("Order/payment error:", err);
+    return res.status(500).json({ error: "Failed to place order." });
   }
+
+  // Respond immediately
+  res.json({ message: "Order placed successfully", orderId });
+
+  // Fire-and-forget invoice + email
+  (async () => {
+    try {
+      const invoiceItems = cart.map(i => ({ name: i.name, qty: Number(i.quantity), price: Number(i.price) }));
+      const totalAmount = invoiceItems.reduce((sum, i) => sum + i.qty * i.price, 0);
+      const invoicePath = path.join(invoicesDir, `invoice_${orderId}.pdf`);
+
+      await generateInvoice(
+        { id: orderId, customerName: req.session.user.name, items: invoiceItems, total: totalAmount },
+        invoicePath
+      );
+
+      const pdfBuffer = fs.readFileSync(invoicePath);
+      const data = {
+        from:       process.env.EMAIL_FROM,
+        to:         req.session.user.email,
+        subject:    `Your Invoice #${orderId}`,
+        text:       "Thank you for your purchase! Your invoice is attached.",
+        attachment: pdfBuffer
+      };
+
+      mg.messages().send(data, (err, body) => {
+        if (err) console.error("Mailgun error:", err);
+        else console.log("Invoice emailed via Mailgun:", body.id);
+      });
+    } catch (e) {
+      console.error("Invoice/email background error:", e);
+    }
+  })();
 });
 
-
-
-
-// New: Get average rating
-app.get('/api/ratings/:productId', async (req, res) => {
-  const { productId } = req.params;
-  try {
-    const [rows] = await pool.promise().query(
-      `SELECT AVG(rating) AS average_rating, COUNT(*) AS total_ratings
-       FROM ratings
-       WHERE product_id = ?`,
-      [productId]
-    );
-    res.json(rows[0]);
-  } catch (err) {
-    console.error('Error fetching rating:', err);
-    res.status(500).json({ error: 'Failed to fetch rating' });
-  }
+app.get("/api/invoice/:orderId", (req, res) => {
+  const file = path.join(invoicesDir, `invoice_${req.params.orderId}.pdf`);
+  res.sendFile(file, err => {
+    if (err) res.status(404).json({ error: "Invoice not found" });
+  });
 });
+app.post('/api/invoice/:orderId/email', async (req, res) => {
+  const orderId = req.params.orderId;
+  const user = req.session.user;
+  if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
-// Can user review a product?
-app.get('/api/can-review/:productId', async (req, res) => {
-  if (!req.session.user?.id) return res.status(401).json({ error: 'Unauthorized' });
-
-  const userId = req.session.user.id;
-  const { productId } = req.params;
+  const invoicePath = path.join(invoicesDir, `invoice_${orderId}.pdf`);
+  if (!fs.existsSync(invoicePath)) {
+    return res.status(404).json({ error: 'Invoice file not found' });
+  }
 
   try {
-    const [rows] = await pool.promise().query(
-      `SELECT 1
-       FROM orders o
-       JOIN order_items oi ON o.id = oi.order_id
-       WHERE o.user_id = ? AND oi.product_id = ?`,
-      [userId, productId]
-    );
+    const pdfBuffer = fs.readFileSync(invoicePath);
+    const data = {
+      from:       process.env.EMAIL_FROM,
+      to:         user.email,
+      subject:    `Your Invoice #${orderId}`,
+      text:       'Here is your invoice again. Thank you for your purchase!',
+      attachment: pdfBuffer
+    };
 
-    res.json({ canReview: rows.length > 0 });
-  } catch (err) {
-    console.error('Error checking review eligibility:', err);
+    mg.messages().send(data, (err, body) => {
+      if (err) {
+        console.error('Mailgun resend error:', err);
+        return res.status(500).json({ error: 'Failed to send email' });
+      }
+      console.log('Invoice re-emailed via Mailgun:', body.id);
+      return res.json({ message: 'Invoice emailed successfully' });
+    });
+  } catch (e) {
+    console.error('Resend background error:', e);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Post rating
-app.post('/api/ratings', async (req, res) => {
-  if (!req.session.user?.id) return res.status(401).json({ error: 'Unauthorized' });
 
-  const { productId, rating } = req.body;
-  const userId = req.session.user.id;
+// ----- COMMENT & RATING ROUTES -----
 
-  if (!productId || !rating) return res.status(400).json({ error: 'Product ID and rating required.' });
-
-  try {
-    // Check if user already rated
-    const [existing] = await pool.promise().query(
-      `SELECT * FROM ratings WHERE user_id = ? AND product_id = ?`,
-      [userId, productId]
-    );
-
-    if (existing.length > 0) {
-      return res.status(400).json({ error: 'You have already rated this product.' });
-    }
-
-    // Insert rating
-    await pool.promise().query(
-      `INSERT INTO ratings (user_id, product_id, rating) VALUES (?, ?, ?)`,
-      [userId, productId, rating]
-    );
-
-    res.json({ message: 'Rating added successfully.' });
-  } catch (err) {
-    console.error('Rating error:', err);
-    res.status(500).json({ error: 'Failed to submit rating.' });
-  }
-});
-
-
-// Post comment
-app.post('/api/comments', async (req, res) => {
-  if (!req.session.user?.id) return res.status(401).json({ error: 'Unauthorized' });
-
-  const { productId, comment_text } = req.body;
-  const userId = req.session.user.id;
-
-  if (!productId || !comment_text) return res.status(400).json({ error: 'Product ID and comment required.' });
-
-  try {
-    const [ratingRows] = await pool.promise().query(
-      `SELECT * FROM ratings WHERE user_id = ? AND product_id = ?`,
-      [userId, productId]
-    );
-
-    if (ratingRows.length === 0) {
-      return res.status(403).json({ error: 'You must rate before commenting.' });
-    }
-	
-	const [pending] = await pool.promise().query(
-	  `SELECT * FROM comments WHERE user_id = ? AND product_id = ? AND approved = FALSE`,
-	  [userId, productId]
-	);
-
-	if (pending.length > 0) {
-	  return res.status(400).json({ error: 'You already have a pending comment for this product.' });
-	}
-
-
-    await pool.promise().query(
-      `INSERT INTO comments (user_id, product_id, comment_text, approved, created_at)
-       VALUES (?, ?, ?, FALSE, NOW())`,
-      [userId, productId, comment_text]
-    );
-
-    res.json({ message: 'Comment submitted for review and will appear once approved.' });
-  } catch (err) {
-    console.error('Comment error:', err);
-    res.status(500).json({ error: 'Failed to post comment.' });
-  }
-});
-
-
-// Profile routes
-app.get('/api/user/profile', async (req, res) => {
-  if (!req.session.user?.id) return res.status(401).json({ error: 'Unauthorized' });
-
-  const userId = req.session.user.id;
+app.get("/api/comments/:productId", async (req, res) => {
   try {
     const [rows] = await pool.promise().query(
-      `SELECT id, name, email, home_address FROM users WHERE id = ?`,
-      [userId]
+      `SELECT c.id AS comment_id, c.user_id, c.comment_text, c.created_at, u.name
+       FROM comments c
+       JOIN users u ON u.id = c.user_id
+       WHERE c.product_id = ? AND c.approved = TRUE
+       ORDER BY c.created_at DESC`,
+      [req.params.productId]
     );
-    if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
-    res.json(rows[0]);
+    res.json(rows);
   } catch (err) {
-    console.error('Profile error:', err);
-    res.status(500).json({ error: 'Failed to fetch profile' });
+    console.error("Comments fetch error:", err);
+    res.status(500).json({ error: "Failed to fetch comments" });
   }
 });
 
-// Update profile
-app.put('/api/user/profile', async (req, res) => {
-  if (!req.session.user?.id) return res.status(401).json({ error: 'Unauthorized' });
-
-  const userId = req.session.user.id;
-  const { name, home_address, password } = req.body;
-
-  if (!name) return res.status(400).json({ error: 'Name is required' });
-
+app.get("/api/pending-comment/:productId", async (req, res) => {
+  const userId = req.session.user?.id;
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
   try {
-    const fields = [];
-    const params = [];
-
-    fields.push('name = ?');
-    params.push(name);
-
-    fields.push('home_address = ?');
-    params.push(home_address || null);
-
-    if (password) {
-      const hashed = bcrypt.hashSync(password, 10);
-      fields.push('password = ?');
-      params.push(hashed);
-    }
-
-    params.push(userId);
-
-    const sql = `UPDATE users SET ${fields.join(', ')} WHERE id = ?`;
-    await pool.promise().query(sql, params);
-
-    res.json({ message: 'Profile updated successfully' });
+    const [rows] = await pool.promise().query(
+      `SELECT id AS comment_id, comment_text, created_at
+       FROM comments
+       WHERE product_id = ? AND user_id = ? AND approved = FALSE
+       ORDER BY created_at DESC LIMIT 1`,
+      [req.params.productId, userId]
+    );
+    res.json(rows[0] || null);
   } catch (err) {
-    console.error('Update profile error:', err);
-    res.status(500).json({ error: 'Failed to save profile' });
+    console.error("Pending comment error:", err);
+    res.status(500).json({ error: "Failed to fetch pending comment" });
+  }
+});
+
+app.delete("/api/delete-comment/:commentId", async (req, res) => {
+  const userId = req.session.user?.id;
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  try {
+    const [[c]] = await pool.promise().query(
+      "SELECT product_id FROM comments WHERE id = ? AND user_id = ?",
+      [req.params.commentId, userId]
+    );
+    if (!c) return res.status(404).json({ error: "Comment not found or not authorized." });
+
+    await pool.promise().query("DELETE FROM comments WHERE id = ? AND user_id = ?", [
+      req.params.commentId, userId
+    ]);
+    await pool.promise().query("DELETE FROM ratings WHERE product_id = ? AND user_id = ?", [
+      c.product_id, userId
+    ]);
+    res.json({ message: "Comment and rating deleted successfully." });
+  } catch (err) {
+    console.error("Delete comment error:", err);
+    res.status(500).json({ error: "Failed to delete comment and rating." });
+  }
+});
+
+app.get("/api/ratings/:productId", async (req, res) => {
+  try {
+    const [row] = await pool.promise().query(
+      `SELECT AVG(rating) AS average_rating, COUNT(*) AS total_ratings
+       FROM ratings WHERE product_id = ?`,
+      [req.params.productId]
+    );
+    res.json(row[0] || row);
+  } catch (err) {
+    console.error("Ratings fetch error:", err);
+    res.status(500).json({ error: "Failed to fetch rating" });
+  }
+});
+
+app.get("/api/can-review/:productId", async (req, res) => {
+  const userId = req.session.user?.id;
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  try {
+    const [rows] = await pool.promise().query(
+      `SELECT 1 FROM orders o
+       JOIN order_items oi ON oi.order_id = o.id
+       WHERE o.user_id = ? AND oi.product_id = ?`,
+      [userId, req.params.productId]
+    );
+    res.json({ canReview: rows.length > 0 });
+  } catch (err) {
+    console.error("Can-review error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/api/ratings", async (req, res) => {
+  const userId = req.session.user?.id;
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  const { productId, rating } = req.body;
+  if (!productId || rating == null) {
+    return res.status(400).json({ error: "Product ID and rating required." });
+  }
+  try {
+    const [exist] = await pool.promise().query(
+      "SELECT 1 FROM ratings WHERE user_id = ? AND product_id = ?",
+      [userId, productId]
+    );
+    if (exist.length) {
+      return res.status(400).json({ error: "You have already rated this product." });
+    }
+    await pool.promise().query(
+      "INSERT INTO ratings (user_id, product_id, rating) VALUES (?,?,?)",
+      [userId, productId, rating]
+    );
+    res.json({ message: "Rating added successfully." });
+  } catch (err) {
+    console.error("Post rating error:", err);
+    res.status(500).json({ error: "Failed to submit rating." });
+  }
+});
+
+app.post("/api/comments", async (req, res) => {
+  const userId = req.session.user?.id;
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  const { productId, comment_text } = req.body;
+  if (!productId || !comment_text) {
+    return res.status(400).json({ error: "Product ID and comment required." });
+  }
+  try {
+    const [rated] = await pool.promise().query(
+      "SELECT 1 FROM ratings WHERE user_id = ? AND product_id = ?",
+      [userId, productId]
+    );
+    if (!rated.length) {
+      return res.status(403).json({ error: "You must rate before commenting." });
+    }
+    const [pending] = await pool.promise().query(
+      `SELECT 1 FROM comments
+       WHERE user_id = ? AND product_id = ? AND approved = FALSE`,
+      [userId, productId]
+    );
+    if (pending.length) {
+      return res.status(400).json({ error: "You already have a pending comment." });
+    }
+    await pool.promise().query(
+      `INSERT INTO comments (user_id, product_id, comment_text, approved, created_at)
+       VALUES (?,?,?,FALSE,NOW())`,
+      [userId, productId, comment_text]
+    );
+    res.json({ message: "Comment submitted for review." });
+  } catch (err) {
+    console.error("Post comment error:", err);
+    res.status(500).json({ error: "Failed to post comment." });
+  }
+});
+
+// ----- PROFILE ROUTES -----
+
+app.get("/api/user/profile", async (req, res) => {
+  const userId = req.session.user?.id;
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  try {
+    const [rows] = await pool.promise().query(
+      "SELECT id, name, email, home_address FROM users WHERE id = ?",
+      [userId]
+    );
+    if (!rows.length) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    res.json(rows[0]);
+  } catch (err) {
+    console.error("Get profile error:", err);
+    res.status(500).json({ error: "Failed to fetch profile" });
+  }
+});
+
+app.put("/api/user/profile", async (req, res) => {
+  const userId = req.session.user?.id;
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  const { name, home_address, password } = req.body;
+  if (!name) return res.status(400).json({ error: "Name is required" });
+  try {
+    const fields = ["name = ?"];
+    const params = [name];
+    fields.push("home_address = ?");
+    params.push(home_address || null);
+    if (password) {
+      const h = bcrypt.hashSync(password, 10);
+      fields.push("password = ?");
+      params.push(h);
+    }
+    params.push(userId);
+    const sql = `UPDATE users SET ${fields.join(",")} WHERE id = ?`;
+    await pool.promise().query(sql, params);
+    res.json({ message: "Profile updated successfully" });
+  } catch (err) {
+    console.error("Update profile error:", err);
+    res.status(500).json({ error: "Failed to save profile" });
   }
 });
 
