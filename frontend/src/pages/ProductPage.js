@@ -99,6 +99,12 @@ function ProductPage() {
   const [showPending, setShowPending] = useState(false);
   const { user } = useContext(SessionContext);
   const [isWishlisted, setIsWishlisted] = useState(false);
+  const [categories, setCategories] = useState([]);
+  
+  const getCategoryName = (category_id) => {
+	  const cat = categories.find(c => c.id === category_id);
+	  return cat ? cat.name : '';
+	};
   
   useEffect(() => {
 	  if (!user) {
@@ -107,53 +113,60 @@ function ProductPage() {
 	}, [user]);
 
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const [prodRes, commRes, rateRes, canRes, pendingRes, wishlistRes] = await Promise.all([
-		  fetch(`/api/products/${id}`),
-		  fetch(`/api/comments/${id}`),
-		  fetch(`/api/ratings/${id}`),
-		  fetch(`/api/can-review/${id}`, { credentials: 'include' }),
-		  fetch(`/api/pending-comment/${id}`, { credentials: 'include' }),
-		  fetch('/api/wishlist', { credentials: 'include' }),
-		]);
-        if (!prodRes.ok) throw new Error(`Failed to load product (${prodRes.status})`);
-        const prodData = await prodRes.json();
-        setProduct(prodData);
+useEffect(() => {
+  async function loadData() {
+    try {
+      const [prodRes, commRes, rateRes, canRes, pendingRes, wishlistRes, catRes] = await Promise.all([
+        fetch(`/api/products/${id}`),
+        fetch(`/api/comments/${id}`),
+        fetch(`/api/ratings/${id}`),
+        fetch(`/api/can-review/${id}`, { credentials: 'include' }),
+        fetch(`/api/pending-comment/${id}`, { credentials: 'include' }),
+        fetch('/api/wishlist', { credentials: 'include' }),
+        fetch('/api/categories'),
+      ]);
 
-        if (commRes.ok) setComments(await commRes.json());
-        if (rateRes.ok) {
-          const { average_rating } = await rateRes.json();
-          setAvgRating(average_rating);
-        }
-        if (canRes.ok) {
-          const { canReview } = await canRes.json();
-          setCanReview(canReview);
-        }
-		if (pendingRes.ok) {
-		  const pendingData = await pendingRes.json();
-		  if (pendingData) {
-			setPendingReview({
-			  id: pendingData.comment_id,
-			  rating: pendingData.rating,
-			  comment: pendingData.comment_text,
-			  date: new Date(pendingData.created_at)
-			});
-		  }
-		}
-		if (wishlistRes.ok) {
-           const wishlistItems = await wishlistRes.json();
-           setIsWishlisted(wishlistItems.some(p => p.id === prodData.id));
-         }
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
+      if (!prodRes.ok) throw new Error(`Failed to load product (${prodRes.status})`);
+      const prodData = await prodRes.json();
+      setProduct(prodData);
+
+      if (commRes.ok) setComments(await commRes.json());
+      if (rateRes.ok) {
+        const { average_rating } = await rateRes.json();
+        setAvgRating(average_rating);
       }
+      if (canRes.ok) {
+        const { canReview } = await canRes.json();
+        setCanReview(canReview);
+      }
+      if (pendingRes.ok) {
+        const pendingData = await pendingRes.json();
+        if (pendingData) {
+          setPendingReview({
+            id: pendingData.comment_id,
+            rating: pendingData.rating,
+            comment: pendingData.comment_text,
+            date: new Date(pendingData.created_at),
+          });
+        }
+      }
+      if (wishlistRes.ok) {
+        const wishlistItems = await wishlistRes.json();
+        setIsWishlisted(wishlistItems.some(p => p.id === prodData.id));
+      }
+      if (catRes.ok) {
+        setCategories(await catRes.json());
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
-    loadData();
-  }, [id, user]);
+  }
+
+  loadData();
+}, [id, user]);
+
 
   const handleGoBack = () => navigate('/');
   const handleIncrement = () => product && setQuantity(q => Math.min(q + 1, product.stock));
@@ -172,6 +185,7 @@ function ProductPage() {
        console.error('Wishlist error:', err);
      }
    };
+
   async function handleDeleteComment(commentId) {
 	  try {
 		await fetch(`/api/delete-comment/${commentId}`, { method: 'DELETE', credentials: 'include' });
@@ -257,7 +271,7 @@ function ProductPage() {
           <InfoContainer>
             <Typography variant="h4">{product.name}</Typography>
             <Typography>{product.description}</Typography>
-            <Typography variant="subtitle1">Category: {product.category}</Typography>
+            <Typography variant="subtitle1">Category: {getCategoryName(product.category_id)}</Typography>
             <Typography variant="h6" color="primary">${product.price}</Typography>
             <Typography>Stock: {product.stock}</Typography>
             <QuantityContainer>
