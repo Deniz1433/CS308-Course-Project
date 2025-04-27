@@ -20,28 +20,36 @@ const Login = () => {
     const [error, setError] = useState("");
 
     const handleLogin = async (e) => {
-        e.preventDefault();
-        setError("");
-    
-        try {
-            const response = await fetch("/api/login", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                credentials: "include", // ✅ THIS LINE IS CRUCIAL
-                body: JSON.stringify({ email, password }),
-            });
-    
-            const data = await response.json();
-            if (!response.ok) {
-                throw new Error(data.error || "Login failed");
-            }
-    
-            login({ id: data.user.id, name: data.user.name, email: data.user.email });
-            navigate("/");
-        } catch (err) {
-            setError(err.message);
+    e.preventDefault();
+    setError("");
+
+    try {
+        const response = await fetch("/api/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ email, password }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || "Login failed");
         }
-    };
+
+        // 🚀 Pass full user info INCLUDING roles!
+        login({
+            id: data.user.id,
+            name: data.user.name,
+            email: data.user.email,
+            roles: data.user.roles
+        });
+
+        navigate("/");
+    } catch (err) {
+        setError(err.message);
+    }
+};
+
     
 
     return (
