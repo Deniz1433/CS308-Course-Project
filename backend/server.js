@@ -41,7 +41,7 @@ const pool = mysql.createPool({
 // ----- PRODUCT ROUTES -----
 
 app.get("/api/products", (req, res) => {
-  pool.query("SELECT * FROM products", (err, results) => {
+  pool.query("SELECT * FROM products WHERE is_active = TRUE", (err, results) => {
     if (err) return res.status(500).json({ error: "Database error" });
     res.json(results);
   });
@@ -50,7 +50,7 @@ app.get("/api/products", (req, res) => {
 app.get("/api/products/:id", (req, res) => {
   const id = Number(req.params.id);
   if (isNaN(id)) return res.status(400).json({ error: "Invalid product ID" });
-  pool.query("SELECT * FROM products WHERE id = ?", [id], (err, results) => {
+  pool.query("SELECT * FROM products WHERE id = ? AND is_active = TRUE", [id], (err, results) => {
     if (err) return res.status(500).json({ error: "Database error" });
     if (results.length === 0) return res.status(404).json({ error: "Product not found" });
     res.json(results[0]);
@@ -607,4 +607,202 @@ app.put("/api/user/profile", async (req, res) => {
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
+});
+
+// product manager
+// Get all unapproved comments for a specific product
+app.get('/api/pending-comments-pm/:productId', async (req, res) => {
+
+  const { productId } = req.params;
+
+  try {
+    const [rows] = await pool.promise().query(
+      `SELECT 
+        c.id AS comment_id,
+        c.user_id,
+        c.comment_text,
+        c.created_at,
+        r.rating
+      FROM comments c
+      LEFT JOIN ratings r ON r.user_id = c.user_id AND r.product_id = c.product_id
+      WHERE c.product_id = ? 
+        AND c.approved = FALSE
+      ORDER BY c.created_at DESC`,
+      [productId]
+    );
+
+    if (rows.length > 0) {
+      res.json(rows);
+    } else {
+      res.json([]);
+    }
+  } catch (err) {
+    console.error('Error fetching pending comments:', err);
+    res.status(500).json({ error: 'Failed to fetch pending comments' });
+  }
+});
+
+// Approve a specific comment
+app.put('/api/approve-comment/:commentId', async (req, res) => {
+  if (!req.session.user?.id) return res.status(401).json({ error: 'Unauthorized' });
+
+  const { commentId } = req.params;
+
+  try {
+    // Update the 'approved' field to true for the specified comment
+    const [result] = await pool.promise().query(
+      `UPDATE comments 
+       SET approved = TRUE 
+       WHERE id = ? AND approved = FALSE`,
+      [commentId]
+    );
+
+    if (result.affectedRows > 0) {
+      res.json({ message: 'Comment approved successfully' });
+    } else {
+      res.status(404).json({ error: 'Comment not found or already approved' });
+    }
+  } catch (err) {
+    console.error('Error approving comment:', err);
+    res.status(500).json({ error: 'Failed to approve comment' });
+  }
+});
+
+app.delete('/api/delete-product/:productId', async (req, res) => {
+  const { productId } = req.params;
+
+  try {
+    const [result] = await pool.promise().query(
+      'UPDATE products SET is_active = FALSE WHERE id = ?',
+      [productId]
+    );
+
+    if (result.affectedRows > 0) {
+      res.json({ message: 'Product deactivated successfully' });
+    } else {
+      res.status(404).json({ error: 'Product not found' });
+    }
+  } catch (err) {
+    console.error('Error deactivating product:', err);
+    res.status(500).json({ error: 'Failed to deactivate product' });
+  }
+});
+
+app.post('/api/add-product', async (req, res) => {
+  const { name, description, category, price, stock = 0, popularity = 0, image_path = null } = req.body;
+
+  if (!name || !category === undefined) {
+    return res.status(400).json({ error: 'Name, category, and price are required' });
+  }
+
+  try {
+    // Query to get category ID based on category name
+    const [categoryResult] = await pool.promise().query(
+      `SELECT id FROM categories WHERE name = ?`, [category]
+    );
+
+    if (categoryResult.length === 0) {
+      return res.status(400).json({ error: 'Category not found' });
+    }
+
+    const categoryId = categoryResult[0].id;
+
+    const [result] = await pool.promise().query(
+      `INSERT INTO products (name, description, category_id, price, stock, popularity, image_path)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [name, description, categoryId, price, stock, popularity, image_path]
+    );
+
+    res.json({ message: 'Product added successfully', productId: result.insertId });
+  } catch (err) {
+    console.error('Error adding product:', err);
+    res.status(500).json({ error: 'Failed to add product' });
+  }
+});
+
+app.put('/api/update-stock/:productId', async (req, res) => {
+  const { productId } = req.params;
+  const { stock } = req.body;
+
+  // Validate productId and stock
+  if (isNaN(productId) || isNaN(stock) || stock < 0) {
+    return res.status(400).json({ error: 'Invalid product ID or stock value' });
+  }
+
+  try {
+    // Check if the product exists in the database
+    const [product] = await pool.promise().query('SELECT * FROM products WHERE id = ?', [productId]);
+    if (product.length === 0) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    // Update the stock of the product
+    await pool.promise().query(
+      'UPDATE products SET stock = ? WHERE id = ?',
+      [stock, productId]
+    );
+
+    res.json({ message: 'Stock updated successfully' });
+  } catch (err) {
+    console.error('Error updating stock:', err);
+    res.status(500).json({ error: 'Failed to update stock' });
+  }
+});
+
+app.get('/api/orders-pm', async (req, res) => {
+  try {
+    const [orders] = await pool.promise().query(
+      `SELECT o.id AS order_id, o.order_date, o.status, 
+              oi.product_id, p.name AS product_name, oi.quantity, oi.price_at_time 
+       FROM orders o
+       JOIN order_items oi ON oi.order_id = o.id
+       JOIN products p ON p.id = oi.product_id`
+    );
+
+    // Group order items by order_id
+    const detailedOrders = orders.reduce((acc, order) => {
+      const { order_id, order_date, status, product_id, product_name, quantity, price_at_time } = order;
+
+      if (!acc[order_id]) {
+        acc[order_id] = {
+          order_id,
+          order_date,
+          status,
+          items: []
+        };
+      }
+
+      acc[order_id].items.push({ product_id, product_name, quantity, price_at_time });
+      
+      return acc;
+    }, {});
+
+    // Convert to an array of order details
+    const result = Object.values(detailedOrders);
+    res.json(result);
+  } catch (err) {
+    console.error('Error fetching orders:', err);
+    res.status(500).json({ error: 'Failed to fetch orders' });
+  }
+});
+
+app.put('/api/orders-pm/:orderId/status', async (req, res) => {
+  const { orderId } = req.params;
+  const { status } = req.body;  // Expecting a new status from the request body
+
+  if (!['processing', 'in-transit', 'delivered', 'refunded'].includes(status)) {
+    return res.status(400).json({ error: 'Invalid status' });
+  }
+
+  try {
+    // Update the order status in the orders table
+    await pool.promise().query(
+      'UPDATE orders SET status = ? WHERE id = ?',
+      [status, orderId]
+    );
+    res.json({ message: 'Order status updated successfully' });
+  } catch (err) {
+    console.error('Error updating order status:', err);
+    res.status(500).json({ error: 'Failed to update order status' });
+  }
 });

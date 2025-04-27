@@ -3,7 +3,7 @@
 import React, { useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SessionContext } from '../middleware/SessionManager';
-import { Typography, Box } from '@mui/material';
+import { Typography, Box, Button} from '@mui/material';
 
 function AdminInterface() {
   const { user, loading } = useContext(SessionContext);
@@ -31,6 +31,7 @@ function AdminInterface() {
     return null;
   }
 
+
   return (
     <Box p={4}>
       <Typography variant="h4" gutterBottom>
@@ -39,9 +40,19 @@ function AdminInterface() {
       <Typography>
         Welcome to the Admin Dashboard! Manage products, view sales, etc.
       </Typography>
+       {/* Show buttons depending on the user's role */}
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={() => navigate('/product-manager')} 
+          disabled={user.role !== 'product_manager'} // Navigate to the Product Management page
+        >
+          Go to Product Management
+        </Button>
     </Box>
   );
 }
 
 export default AdminInterface;
+
 

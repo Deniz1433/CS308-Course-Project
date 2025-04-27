@@ -11,7 +11,7 @@ import Orders from './pages/Orders';
 import ProfilePage from './pages/Profile';
 import AdminInterface from './pages/AdminInterface'; // adjust path if needed
 import Wishlist from './pages/Wishlist';
-
+import ProductManager from './pages/ProductManager';
 
 // MUI & Theming Imports
 import { createTheme, ThemeProvider, styled } from '@mui/material/styles';
@@ -488,6 +488,7 @@ function App() {
               <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
               <Route path="/invoice/:orderId" element={<InvoicePage />} />
 			  <Route path="/admin" element={<AdminInterface />} />
+        <Route path="/product-manager" element={<ProductManager />} />
 			  <Route path="/wishlist" element={<ProtectedRoute><Wishlist /></ProtectedRoute>} />
             </Routes>
           </Router>
