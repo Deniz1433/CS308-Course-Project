@@ -725,7 +725,19 @@ app.delete('/api/delete-product/:productId', async (req, res) => {
 });
 
 app.post('/api/add-product', async (req, res) => {
-  const { name, description, category_id, price, stock = 0, popularity = 0, image_path = null } = req.body;
+  const {
+    name,
+    description = null,
+    category_id,
+    price,
+    stock = 0,
+    popularity = 0,
+    image_path = null,
+    model = 'N/A',
+    serial_number = 'N/A',
+    warranty_status = 'No Warranty',
+    distributor_info = 'N/A'
+  } = req.body;
 
   if (!name || !category_id || !price) {
     return res.status(400).json({ error: 'Name, category, and price are required' });
@@ -733,17 +745,35 @@ app.post('/api/add-product', async (req, res) => {
 
   try {
     const [result] = await pool.promise().query(
-      `INSERT INTO products (name, description, category_id, price, stock, popularity, image_path)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [name, description, category_id, price, stock, popularity, image_path]
+      `INSERT INTO products
+        (name, description, category_id, price, stock, popularity, image_path,
+         model, serial_number, warranty_status, distributor_info)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        name,
+        description,
+        category_id,
+        price,
+        stock,
+        popularity,
+        image_path,
+        model,
+        serial_number,
+        warranty_status,
+        distributor_info
+      ]
     );
 
-    res.json({ message: 'Product added successfully', productId: result.insertId });
+    res.json({
+      message: 'Product added successfully',
+      productId: result.insertId
+    });
   } catch (err) {
     console.error('Error adding product:', err);
     res.status(500).json({ error: 'Failed to add product' });
   }
 });
+
 
 
 app.put('/api/update-stock/:productId', async (req, res) => {
