@@ -169,7 +169,12 @@ function Header({ user, onLogout, onOpenCart, cartCount }) {
 }
 
 // 5. ProductCardItem component
-function ProductCardItem({ product, onAdd, onView, quantity, onIncrement, onDecrement, onQuantityChange }) {
+function ProductCardItem({ product, onAdd, onView, quantity, cartQuantity, onIncrement, onDecrement, onQuantityChange }) {
+	const totalQuantity = quantity + cartQuantity;
+	const isAtLimit = cartQuantity >= product.stock;
+	const isExceeding = totalQuantity > product.stock;
+	
+
   return (
     <ProductCard>
       <CardMedia
@@ -237,9 +242,21 @@ function ProductCardItem({ product, onAdd, onView, quantity, onIncrement, onDecr
 			  <IconButton size="small" onClick={onIncrement} disabled={quantity >= product.stock}>
 				<Add />
 			  </IconButton>
-			  <Button size="small" variant="contained" onClick={() => onAdd(product, quantity)}>
-				Add to Cart
-			  </Button>
+			  <Button 
+				  size="small" 
+				  variant="contained" 
+				  onClick={() => onAdd(product, quantity)}
+				  disabled={isExceeding} // 🚀 prevent overflow
+				  sx={{
+					backgroundColor: isAtLimit ? '#FFEB3B' : 'primary.main',
+					color: isAtLimit ? '#000' : '#fff',
+					'&:hover': {
+					  backgroundColor: isAtLimit ? '#FDD835' : 'primary.dark',
+					},
+				  }}
+				>
+				  {isAtLimit ? 'Max Reached' : 'Add to Cart'}
+            </Button>
 			</>
 		  )}
 		</CardActions>
@@ -259,21 +276,26 @@ export const CartProvider = ({ children }) => {
   }, [cart]);
 
   const addToCart = (product, quantity) => {
-    setCart(prev => {
-      const existing = prev.find(item => item.id === product.id);
-      if (existing) {
-        return prev.map(item =>
-          item.id === product.id ? { ...item, quantity: item.quantity + quantity } : item
-        );
-      }
-      return [...prev, { ...product, quantity }];
-    });
-  };
+	  setCart(prev => {
+		const existing = prev.find(item => item.id === product.id);
+		const newQuantity = existing ? existing.quantity + quantity : quantity;
+		const finalQuantity = Math.min(newQuantity, product.stock); // 🚀 Prevent exceeding stock!
+
+		if (existing) {
+		  return prev.map(item =>
+			item.id === product.id ? { ...item, quantity: finalQuantity } : item
+		  );
+		}
+		return [...prev, { ...product, quantity: finalQuantity }];
+	  });
+	};
+
   const removeFromCart = id => setCart(prev => prev.filter(item => item.id !== id));
   const clearCart = () => setCart([]);
   const updateCartQuantity = (id, quantity) => setCart(prev => prev.map(item =>
     item.id === id ? { ...item, quantity } : item
   ));
+  
 
   return (
     <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateCartQuantity, clearCart }}>
@@ -405,14 +427,15 @@ function ProductListing() {
           {sorted.map(product => (
             <Grid item xs={12} sm={6} md={4} lg={3} key={product.id}>
               <ProductCardItem
-                product={product}
-                quantity={quantityMap[product.id] || 1}
-                onIncrement={() => handleIncrement(product.id, product.stock)}
-                onDecrement={() => handleDecrement(product.id)}
-                onQuantityChange={val => handleQuantityChange(product.id, val, product.stock)}
-                onAdd={addToCart}
-                onView={id => navigate(`/product-page/${id}`)}
-              />
+				  product={product}
+				  quantity={quantityMap[product.id] || 1}
+				  cartQuantity={(cart.find(item => item.id === product.id)?.quantity) || 0}
+				  onIncrement={() => handleIncrement(product.id, product.stock)}
+				  onDecrement={() => handleDecrement(product.id)}
+				  onQuantityChange={val => handleQuantityChange(product.id, val, product.stock)}
+				  onAdd={addToCart}
+				  onView={id => navigate(`/product-page/${id}`)}
+				/>
             </Grid>
           ))}
         </ProductGrid>
