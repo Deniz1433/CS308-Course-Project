@@ -339,7 +339,14 @@ function ProductListing() {
       .catch(console.error);
   }, []);
 
-  const categories = [...new Set(products.map(p => p.category))];
+  const [categories, setCategories] = useState([]);
+ 
+ 	useEffect(() => {
+ 	  fetch('/api/categories')
+ 		.then(res => res.json())
+ 		.then(setCategories)
+ 		.catch(console.error);
+ 	}, []);
 
   const handleQuantityChange = (id, val, stock) => {
     const q = Math.max(1, Math.min(Number(val) || 1, stock));
@@ -354,7 +361,7 @@ function ProductListing() {
 
   const filtered = products.filter(p => {
     const q = search.toLowerCase();
-    return (!category || p.category === category) &&
+    return (!category || p.category_id === category) &&
       (p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q));
   });
 
@@ -421,7 +428,11 @@ function ProductListing() {
 		</Box>
         <Box sx={{ mb: 2 }}>
           <CategoryButton onClick={() => setCategory(null)}>All Products</CategoryButton>
-          {categories.map(cat => (<CategoryButton key={cat} onClick={() => setCategory(cat)}>{cat}</CategoryButton>))}
+          {categories.map(cat => (
+ 			  <CategoryButton key={cat.id} onClick={() => setCategory(cat.id)}>
+ 				{cat.name}
+ 			  </CategoryButton>
+ 			))}
         </Box>
         <ProductGrid container spacing={2}>
           {sorted.map(product => (
