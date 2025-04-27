@@ -39,7 +39,7 @@ import AddCircleIcon from '@mui/icons-material/AddCircle';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
-
+import ReceiptIcon from '@mui/icons-material/Receipt';
 const ProductManager = () => {
   // Tab state
   const [activeTab, setActiveTab] = useState(0);
@@ -51,7 +51,7 @@ const ProductManager = () => {
   const [loadingComments, setLoadingComments] = useState({});
   const [expandedProduct, setExpandedProduct] = useState(null);
   const [updatedStock, setUpdatedStock] = useState({});
-
+  const [deletingComment, setDeletingComment] = useState({});
   // Orders states
   const [orders, setOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
@@ -69,7 +69,7 @@ const ProductManager = () => {
   });
 
   // Status options for orders
-  const orderStatusOptions = ['processing', 'in-transit', 'delivered', 'refunded'];
+  const orderStatusOptions = ['processing', 'in-transit', 'delivered'];
 
   useEffect(() => {
     if (activeTab === 0) {
@@ -141,6 +141,39 @@ const ProductManager = () => {
     }
   };
 
+  const handleDeleteComment = async (commentId) => {
+    if (!window.confirm('Are you sure you want to delete this comment?')) {
+      return;
+    }
+    
+    setDeletingComment(prev => ({ ...prev, [commentId]: true }));
+    
+    try {
+      const response = await fetch(`/api/delete-comment-pm/${commentId}`, {
+        method: 'DELETE',
+      });
+      
+      if (response.ok) {
+        // Update local state to remove the deleted comment
+        setPendingComments(prevState => {
+          const updated = { ...prevState };
+          Object.keys(updated).forEach(productId => {
+            updated[productId] = updated[productId]?.filter(c => c.comment_id !== commentId);
+          });
+          return updated;
+        });
+      } else {
+        const result = await response.json();
+        alert(result.error || 'Failed to delete comment');
+      }
+    } catch (err) {
+      console.error('Error deleting comment:', err);
+      alert('An error occurred while deleting the comment');
+    } finally {
+      setDeletingComment(prev => ({ ...prev, [commentId]: false }));
+    }
+  };
+
   const handleAccordionChange = (productId) => (event, isExpanded) => {
     setExpandedProduct(isExpanded ? productId : null);
     if (isExpanded) fetchPendingComments(productId);
@@ -177,7 +210,7 @@ const ProductManager = () => {
     const { name, category, price } = newProduct;
 
     if (!name || !category) {
-      alert('Please enter product name, category, and price');
+      alert('Please enter product name and category');
       return;
     }
 
@@ -223,6 +256,7 @@ const ProductManager = () => {
       alert('An error occurred while adding the product');
     }
   };
+
 
   const handleUpdateStock = async (productId, newStock) => {
     try {
@@ -285,9 +319,8 @@ const ProductManager = () => {
   const getStatusColor = (status) => {
     switch (status) {
       case 'processing': return 'info';
-      case 'in-transit': return 'success';
+      case 'in-transit': return 'warning';
       case 'delivered': return 'success';
-      case 'refunded': return 'warning';
       default: return 'default';
     }
   };
@@ -479,7 +512,7 @@ const ProductManager = () => {
                                   setUpdatedStock(prev => ({ ...prev, [product.id]: '' }));
                                 } else if (/^\d+$/.test(value)) {
                                   const numericValue = parseInt(value, 10);
-                                  if (numericValue >= 1) {
+                                  if (numericValue >= 0) {
                                     setUpdatedStock(prev => ({ ...prev, [product.id]: value }));
                                   }
                                 }
@@ -562,6 +595,16 @@ const ProductManager = () => {
                                 >
                                   Approve Comment
                                 </Button>
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  color="error"
+                                  startIcon={<DeleteIcon />}
+                                  onClick={() => handleDeleteComment(comment.comment_id)}
+                                  disabled={deletingComment[comment.comment_id]}
+                                >
+                                  {deletingComment[comment.comment_id] ? 'Deleting...' : 'Delete Comment'}
+                                </Button>
                               </Paper>
                             ))}
                           </Stack>
@@ -630,19 +673,42 @@ const ProductManager = () => {
                           Order Summary
                         </Typography>
                         <Grid container spacing={2}>
-                          <Grid item xs={12} md={8}>
-                            <Paper variant="outlined" sx={{ p: 2 }}>
-                              <Typography variant="body2">
-                                <strong>Items:</strong> {order.items.length}
-                              </Typography>
-                              <Typography variant="body2">
-                                <strong>Total Quantity:</strong> {order.items.reduce((sum, item) => sum + item.quantity, 0)} items
-                              </Typography>
-                              <Typography variant="body1" sx={{ mt: 1, fontWeight: 'bold' }}>
-                                Total: ${orderTotal}
-                              </Typography>
-                            </Paper>
-                          </Grid>
+                        <Grid item xs={12} md={8}>
+                          <Paper variant="outlined" sx={{ p: 2 }}>
+                            <Typography variant="body2">
+                              <strong>Customer ID:</strong> {order.user_id}
+                            </Typography>
+                            <Typography variant="subtitle2" sx={{ mt: 1.5, mb: 0.5 }}>
+                              Shipping Address:
+                            </Typography>
+                            <Typography variant="body2" sx={{ mb: 1.5 }}>
+                              {order.order_address}
+                            </Typography>
+                            <Divider sx={{ my: 1.5 }} />
+                            <Typography variant="body2">
+                              <strong>Items:</strong> {order.items.length}
+                            </Typography>
+                            <Typography variant="body2">
+                              <strong>Total Quantity:</strong> {order.items.reduce((sum, item) => sum + item.quantity, 0)} items
+                            </Typography>
+                            <Typography variant="body1" sx={{ mt: 1, fontWeight: 'bold' }}>
+                              Total: ${orderTotal}
+                            </Typography>
+                            
+                            {/* Add the View Invoice button here */}
+                            <Button
+                              variant="contained"
+                              href={`http://localhost:5000/api/invoice/${order.order_id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              sx={{ mt: 2 }}
+                              size="small"
+                              startIcon={<ReceiptIcon />}
+                            >
+                              View Invoice
+                            </Button>
+                          </Paper>
+                        </Grid>
                           
                           <Grid item xs={12} md={4}>
                             <Paper variant="outlined" sx={{ p: 2 }}>

@@ -88,6 +88,7 @@ CREATE TABLE IF NOT EXISTS orders (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,
   order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  order_address VARCHAR(255) DEFAULT NULL,
   status ENUM('processing', 'delivered', 'cancelled', 'refunded', 'in-transit') DEFAULT 'processing',
   FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB;
