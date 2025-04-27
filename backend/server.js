@@ -137,6 +137,7 @@ app.post("/api/login", async (req, res) => {
       id:    user.id,
       name:  user.name,
       email: user.email,
+      home_address: user.home_address,
       roles: roles.map(r => r.name),
     };
     res.json({ message: "Login successful", user: req.session.user });
@@ -145,6 +146,8 @@ app.post("/api/login", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+
+
 
 app.post("/api/logout", (req, res) => {
   req.session.destroy(err => {

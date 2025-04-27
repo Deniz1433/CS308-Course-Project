@@ -36,23 +36,19 @@ export default function Payment() {
   const [loading, setLoading] = useState(false);
   const [address, setAddress] = useState('');
   const handleGoBack = () => navigate('/');
-  
-  useEffect(() => {
-	  if (!sessionLoading) {
-		if (!user) {
-		  navigate('/login', { replace: true, state: { from: '/payment' } });
-		} else if (user.home_address) {
-		  setAddress(user.home_address);
-		}
-	  }
-	}, [sessionLoading, user, navigate]);
-
 
   useEffect(() => {
     if (!sessionLoading && !user) {
       navigate('/login', { replace: true, state: { from: '/payment' } });
     }
   }, [sessionLoading, user, navigate]);
+  
+  useEffect(() => {
+	  if (user?.home_address) {
+		setAddress(user.home_address);
+	  }
+	}, [user]);
+
 
   if (sessionLoading) {
     return (
@@ -249,11 +245,11 @@ export default function Payment() {
 		  InputProps={{
 			sx: {
 			  color: '#000',
-			  backgroundColor: '#ffffff',  // <-- put it inside InputProps
+			  backgroundColor: '#ffffff',
 			  borderRadius: 1,
-			  '&:before': { borderBottomColor: '#ccc' }, // normal border color
-			  '&:hover:before': { borderBottomColor: '#888' }, // on hover
-			  '&:after': { borderBottomColor: '#1976d2' }, // when focused
+			  '&:before': { borderBottomColor: '#ccc' },
+			  '&:hover:before': { borderBottomColor: '#888' },
+			  '&:after': { borderBottomColor: '#1976d2' },
 			}
 		  }}
 		  InputLabelProps={{ sx: { color: '#555' } }}
