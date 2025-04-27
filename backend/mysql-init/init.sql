@@ -88,7 +88,7 @@ CREATE TABLE IF NOT EXISTS orders (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,
   order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  status ENUM('processing', 'delivered', 'cancelled', 'refunded') DEFAULT 'processing',
+  status ENUM('processing', 'delivered', 'cancelled', 'refunded', 'in-transit') DEFAULT 'processing',
   FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB;
 
@@ -150,9 +150,11 @@ ADD COLUMN price_approved BOOLEAN DEFAULT FALSE;
 ALTER TABLE comments
 ADD COLUMN approved BOOLEAN DEFAULT FALSE;
 
+ALTER TABLE products
+ADD COLUMN is_active BOOLEAN DEFAULT TRUE;
+
 -- Link users and their roles
 ALTER TABLE users ADD COLUMN role_id INT DEFAULT NULL, ADD FOREIGN KEY (role_id) REFERENCES roles(id);
-
 
 INSERT INTO roles (name) VALUES 
 ('customer'),
