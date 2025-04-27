@@ -10,26 +10,28 @@ function AdminInterface() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!loading) {
-      if (!user || (user.role !== 'product_manager' && user.role !== 'sales_manager')) {
-        navigate('/');
-      }
-    }
-  }, [user, loading, navigate]);
+	  if (!loading) {
+		if (
+		  !user || 
+		  (!user.roles.includes('product_manager') && !user.roles.includes('sales_manager'))
+		) {
+		  navigate('/');
+		}
+	  }
+	}, [user, loading, navigate]);
 
-  if (loading) {
-    // Don't render page while loading
-    return (
-      <Box p={4}>
-        <Typography>Loading...</Typography>
-      </Box>
-    );
-  }
+	if (loading) {
+	  return (
+		<Box p={4}>
+		  <Typography>Loading...</Typography>
+		</Box>
+	  );
+	}
 
-  if (!user || (user.role !== 'product_manager' && user.role !== 'sales_manager')) {
-    // Don't even render Admin UI
-    return null;
-  }
+	if (!user || (!user.roles.includes('product_manager') && !user.roles.includes('sales_manager'))) {
+	  return null;
+	}
+
 
 
   return (
@@ -42,13 +44,13 @@ function AdminInterface() {
       </Typography>
        {/* Show buttons depending on the user's role */}
         <Button
-          variant="contained"
-          color="primary"
-          onClick={() => navigate('/product-manager')} 
-          disabled={user.role !== 'product_manager'} // Navigate to the Product Management page
-        >
-          Go to Product Management
-        </Button>
+		  variant="contained"
+		  color="primary"
+		  onClick={() => navigate('/product-manager')} 
+		  disabled={!user.roles.includes('product_manager')}
+		>
+		  Go to Product Management
+		</Button>
     </Box>
   );
 }
