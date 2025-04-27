@@ -39,7 +39,11 @@ import AddCircleIcon from '@mui/icons-material/AddCircle';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
+
 import ReceiptIcon from '@mui/icons-material/Receipt';
+
+import { useDropzone } from 'react-dropzone';
+
 const ProductManager = () => {
   // Tab state
   const [activeTab, setActiveTab] = useState(0);
@@ -57,6 +61,34 @@ const ProductManager = () => {
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [orderStatusUpdating, setOrderStatusUpdating] = useState({});
   const [expandedOrder, setExpandedOrder] = useState(null);
+  
+  const [uploadedImageName, setUploadedImageName] = useState('');
+	const { getRootProps, getInputProps } = useDropzone({
+	  accept: {
+		'image/jpeg': ['.jpeg', '.jpg'],
+		'image/png': ['.png']
+	  },
+	  onDrop: async (acceptedFiles) => {
+		const file = acceptedFiles[0];
+		if (!file) return;
+
+		const formData = new FormData();
+		formData.append('image', file);
+
+		try {
+		  const res = await fetch('/api/upload-image', {
+			method: 'POST',
+			body: formData,
+		  });
+		  const data = await res.json();
+		  setUploadedImageName(file.name);
+		  handleInputChange('image_path', data.filePath); // Set image_path automatically
+		} catch (error) {
+		  console.error('Image upload failed', error);
+		}
+	  }
+	});
+
 
   const [newProduct, setNewProduct] = useState({
     name: '',
@@ -67,6 +99,22 @@ const ProductManager = () => {
     popularity: '',
     image_path: '',
   });
+  
+  const [categories, setCategories] = useState([]);
+
+	useEffect(() => {
+	  async function fetchCategories() {
+		try {
+		  const res = await fetch('/api/categories');
+		  const data = await res.json();
+		  setCategories(data);
+		} catch (error) {
+		  console.error("Failed to fetch categories", error);
+		}
+	  }
+	  fetchCategories();
+	}, []);
+
 
   // Status options for orders
   const orderStatusOptions = ['processing', 'in-transit', 'delivered'];
@@ -207,55 +255,59 @@ const ProductManager = () => {
   };
 
   const handleAddProduct = async () => {
-    const { name, category, price } = newProduct;
 
-    if (!name || !category) {
-      alert('Please enter product name and category');
-      return;
-    }
+  const { name, category_id, price } = newProduct;
 
-    try {
-      const response = await fetch('/api/add-product', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...newProduct,
-          price: parseFloat(newProduct.price),
-          stock: newProduct.stock ? parseInt(newProduct.stock) : 0,
-          popularity: newProduct.popularity ? parseInt(newProduct.popularity) : 0,
-        }),
+  if (!name || !category_id || !price) {
+    alert('Please enter product name, category, and price');
+    return;
+  }
+
+  try {
+    const response = await fetch('/api/add-product', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...newProduct,
+        price: parseFloat(newProduct.price),
+        stock: newProduct.stock ? parseInt(newProduct.stock) : 0,
+        popularity: newProduct.popularity ? parseInt(newProduct.popularity) : 0,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (response.ok) {
+      const addedProduct = {
+        id: result.productId,
+        ...newProduct,
+        price: parseFloat(newProduct.price),
+        stock: newProduct.stock ? parseInt(newProduct.stock) : 0,
+        popularity: newProduct.popularity ? parseInt(newProduct.popularity) : 0,
+      };
+
+      setProducts(prevProducts => [...prevProducts, addedProduct]);
+      setNewProduct({
+        name: '',
+        description: '',
+        category_id: '',  // <-- ✅ reset category_id not category
+        price: '',
+        stock: '',
+        popularity: '',
+        image_path: '',
+
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        const addedProduct = {
-          id: result.productId,
-          ...newProduct,
-          price: parseFloat(newProduct.price),
-          stock: newProduct.stock ? parseInt(newProduct.stock) : 0,
-          popularity: newProduct.popularity ? parseInt(newProduct.popularity) : 0,
-        };
-
-        setProducts(prevProducts => [...prevProducts, addedProduct]);
-        setNewProduct({
-          name: '',
-          description: '',
-          category: '',
-          price: '',
-          stock: '',
-          popularity: '',
-          image_path: '',
-        });
-        alert('Product added successfully');
-      } else {
-        const result = await response.json();
-        alert(result.error || 'Failed to add product');
-      }
-    } catch (err) {
-      console.error('Error adding product:', err);
-      alert('An error occurred while adding the product');
+      alert('Product added successfully');
+    } else {
+      alert(result.error || 'Failed to add product');
     }
-  };
+  } catch (err) {
+    console.error('Error adding product:', err);
+    alert('An error occurred while adding the product');
+  }
+};
+
 
 
   const handleUpdateStock = async (productId, newStock) => {
@@ -341,102 +393,172 @@ const ProductManager = () => {
     return (
       <>
         {/* Add Product Form */}
-        <Card elevation={3} sx={{ mb: 5, overflow: 'visible' }}>
-          <CardContent>
-            <Typography variant="h6" fontWeight="medium" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-              <AddCircleIcon sx={{ mr: 1 }} /> Add New Product
-            </Typography>
-            <Divider sx={{ my: 2 }} />
-            
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6} md={4}>
-                <TextField
-                  fullWidth
-                  required
-                  label="Name"
-                  value={newProduct.name}
-                  onChange={(e) => handleInputChange('name', e.target.value)}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4}>
-                <TextField
-                  fullWidth
-                  required
-                  label="Category"
-                  value={newProduct.category}
-                  onChange={(e) => handleInputChange('category', e.target.value)}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4}>
-                <TextField
-                  fullWidth
-                  required
-                  label="Price ($)"
-                  type="number"
-                  value={newProduct.price}
-                  onChange={(e) => handleInputChange('price', e.target.value)}
-                  InputProps={{
-                    inputProps: { min: 0, step: 0.01 }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4}>
-                <TextField
-                  fullWidth
-                  label="Initial Stock"
-                  type="number"
-                  value={newProduct.stock}
-                  onChange={(e) => handleInputChange('stock', e.target.value)}
-                  InputProps={{
-                    inputProps: { min: 0 }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4}>
-                <TextField
-                  fullWidth
-                  label="Popularity (1-10)"
-                  type="number"
-                  value={newProduct.popularity}
-                  onChange={(e) => handleInputChange('popularity', e.target.value)}
-                  InputProps={{
-                    inputProps: { min: 1, max: 10 }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4}>
-                <TextField
-                  fullWidth
-                  label="Image Path"
-                  value={newProduct.image_path}
-                  onChange={(e) => handleInputChange('image_path', e.target.value)}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={3}
-                  label="Description"
-                  value={newProduct.description}
-                  onChange={(e) => handleInputChange('description', e.target.value)}
-                />
-              </Grid>
-            </Grid>
-            
-            <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
-              <Button 
-                variant="contained" 
-                size="large"
-                color="primary" 
-                startIcon={<AddCircleIcon />}
-                onClick={handleAddProduct}
-              >
-                Add Product
-              </Button>
-            </Box>
-          </CardContent>
-        </Card>
+		<Card elevation={3} sx={{ mb: 5, overflow: 'visible' }}>
+		  <CardContent>
+			<Typography variant="h6" fontWeight="medium" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+			  <AddCircleIcon sx={{ mr: 1 }} /> Add New Product
+			</Typography>
+			<Divider sx={{ my: 2 }} />
+			
+			<Grid container spacing={2}>
+			  {/* Name - Required */}
+			  <Grid item xs={12} sm={6} md={4}>
+				<TextField
+				  fullWidth
+				  required
+				  label="Name"
+				  value={newProduct.name}
+				  onChange={(e) => handleInputChange('name', e.target.value)}
+				/>
+			  </Grid>
+
+			  {/* Model - Optional */}
+			  <Grid item xs={12} sm={6} md={4}>
+				<TextField
+				  fullWidth
+				  label="Model"
+				  value={newProduct.model}
+				  onChange={(e) => handleInputChange('model', e.target.value)}
+				/>
+			  </Grid>
+
+			  {/* Serial Number - Optional but Unique */}
+			  <Grid item xs={12} sm={6} md={4}>
+				<TextField
+				  fullWidth
+				  label="Serial Number"
+				  value={newProduct.serial_number}
+				  onChange={(e) => handleInputChange('serial_number', e.target.value)}
+				/>
+			  </Grid>
+
+			  <Grid item xs={12} sm={6} md={4}>
+				  <TextField
+					fullWidth
+					required
+					select
+					label="Category"
+					value={newProduct.category_id}
+					onChange={(e) => handleInputChange('category_id', e.target.value)}
+				  >
+					{categories.map((cat) => (
+					  <MenuItem key={cat.id} value={cat.id}>
+						{cat.name}
+					  </MenuItem>
+					))}
+				  </TextField>
+				</Grid>
+
+			  {/* Price - Required */}
+			  <Grid item xs={12} sm={6} md={4}>
+				<TextField
+				  fullWidth
+				  required
+				  label="Price ($)"
+				  type="number"
+				  value={newProduct.price}
+				  onChange={(e) => handleInputChange('price', e.target.value)}
+				  InputProps={{
+					inputProps: { min: 0, step: 0.01 }
+				  }}
+				/>
+			  </Grid>
+
+			  {/* Stock - Optional (default 0) */}
+			  <Grid item xs={12} sm={6} md={4}>
+				<TextField
+				  fullWidth
+				  label="Initial Stock"
+				  type="number"
+				  value={newProduct.stock}
+				  onChange={(e) => handleInputChange('stock', e.target.value)}
+				  InputProps={{
+					inputProps: { min: 0 }
+				  }}
+				/>
+			  </Grid>
+
+			  {/* Warranty Status - Optional (default 'No Warranty') */}
+			  <Grid item xs={12} sm={6} md={4}>
+				<TextField
+				  fullWidth
+				  label="Warranty Status"
+				  value={newProduct.warranty_status}
+				  onChange={(e) => handleInputChange('warranty_status', e.target.value)}
+				  placeholder="No Warranty"
+				/>
+			  </Grid>
+
+			  {/* Distributor Info - Optional */}
+			  <Grid item xs={12} sm={6} md={4}>
+				<TextField
+				  fullWidth
+				  label="Distributor Info"
+				  value={newProduct.distributor_info}
+				  onChange={(e) => handleInputChange('distributor_info', e.target.value)}
+				/>
+			  </Grid>
+
+			  <Grid item xs={12} sm={6} md={4}>
+			  <Box
+				{...getRootProps()}
+				sx={{
+				  border: '2px dashed #ccc',
+				  borderRadius: 2,
+				  p: 3,
+				  textAlign: 'center',
+				  cursor: 'pointer'
+				}}
+			  >
+				<input {...getInputProps()} />
+				<Typography variant="body1">
+				  {uploadedImageName || "Drag & drop an image here, or click to select"}
+				</Typography>
+			  </Box>
+			</Grid>
+
+			  
+			  {/* Popularity - Optional (default 0) */}
+			  <Grid item xs={12} sm={6} md={4}>
+				<TextField
+				  fullWidth
+				  label="Popularity (1-10)"
+				  type="number"
+				  value={newProduct.popularity}
+				  onChange={(e) => handleInputChange('popularity', e.target.value)}
+				  InputProps={{
+					inputProps: { min: 0, max: 10 }
+				  }}
+				/>
+			  </Grid>
+
+			  {/* Description - Optional */}
+			  <Grid item xs={12}>
+				<TextField
+				  fullWidth
+				  multiline
+				  rows={3}
+				  label="Description"
+				  value={newProduct.description}
+				  onChange={(e) => handleInputChange('description', e.target.value)}
+				/>
+			  </Grid>
+			</Grid>
+
+			<Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
+			  <Button 
+				variant="contained" 
+				size="large"
+				color="primary" 
+				startIcon={<AddCircleIcon />}
+				onClick={handleAddProduct}
+			  >
+				Add Product
+			  </Button>
+			</Box>
+		  </CardContent>
+		</Card>
+
 
         {/* Products List */}
         <Typography variant="h5" gutterBottom sx={{ mb: 3 }}>

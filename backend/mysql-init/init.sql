@@ -188,9 +188,9 @@ VALUES
 
 INSERT INTO users (name, email, home_address, password)
 VALUES 
-('Alice Customer', 'alice@example.com', '123 Elm Street', '$2a$10$PxQGXXccLlv7gLT5NmMKRO9LlaJvRWHvghsBTnSZgdxhJq4uRLHZa'),
-('Bob Manager', 'bob@example.com', '456 Oak Avenue', '$2a$10$PxQGXXccLlv7gLT5NmMKRO9LlaJvRWHvghsBTnSZgdxhJq4uRLHZa'),
-('Charlie Sales', 'charlie@example.com', '789 Pine Road', '$2a$10$PxQGXXccLlv7gLT5NmMKRO9LlaJvRWHvghsBTnSZgdxhJq4uRLHZa');
+('Alice Customer', 'customer@gmail.com', '123 Elm Street', '$2a$10$PxQGXXccLlv7gLT5NmMKRO9LlaJvRWHvghsBTnSZgdxhJq4uRLHZa'),
+('Bob Manager', 'productmanager@gmail.com', '456 Oak Avenue', '$2a$10$PxQGXXccLlv7gLT5NmMKRO9LlaJvRWHvghsBTnSZgdxhJq4uRLHZa'),
+('Charlie Sales', 'salesmanager@gmail.com', '789 Pine Road', '$2a$10$PxQGXXccLlv7gLT5NmMKRO9LlaJvRWHvghsBTnSZgdxhJq4uRLHZa');
 
 INSERT INTO user_roles (user_id, role_id)
 VALUES

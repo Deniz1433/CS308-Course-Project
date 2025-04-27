@@ -82,8 +82,7 @@ function Toast({ message, onClose }) {
 function ProductPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { addToCart } = useContext(CartContext);
-
+  const { addToCart, cart } = useContext(CartContext);
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -100,6 +99,10 @@ function ProductPage() {
   const { user } = useContext(SessionContext);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [categories, setCategories] = useState([]);
+  const cartQuantity = cart.find(item => item.id === product?.id)?.quantity || 0;
+	const totalQuantity = quantity + cartQuantity;
+	const isAtLimit = cartQuantity >= product?.stock;
+	const isExceeding = totalQuantity > product?.stock;
 
   
   useEffect(() => {
@@ -276,7 +279,7 @@ function ProductPage() {
           <ImageContainer>
 		  <Box
 			component="img"
-			src={`/${product.image_path}`}
+			src={`/${product.image_path}`.replace(/\/{2,}/g, '/')}
 			alt={product.name}
 			sx={{
 			  maxWidth: '100%',
@@ -383,9 +386,22 @@ function ProductPage() {
 				Out of Stock
 			  </Typography>
 			) : (
-			  <Button variant="contained" onClick={handleAddToCart}>
-				Add to Cart
-			  </Button>
+			  <Button
+				  variant="contained"
+				  size="large"
+				  onClick={() => addToCart(product, quantity)}
+				  disabled={isExceeding}
+				  sx={{
+					mt: 2,
+					backgroundColor: isAtLimit ? '#FFEB3B' : 'primary.main',
+					color: isAtLimit ? '#000' : '#fff',
+					'&:hover': {
+					  backgroundColor: isAtLimit ? '#FDD835' : 'primary.dark',
+					},
+				  }}
+				>
+				  {isAtLimit ? 'Max Reached' : 'Add to Cart'}
+				</Button>
 			)}
 			{user && (
                <FormControlLabel

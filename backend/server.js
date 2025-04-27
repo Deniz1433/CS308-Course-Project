@@ -156,6 +156,42 @@ app.post("/api/logout", (req, res) => {
   });
 });
 
+const multer = require('multer');
+
+// Use an absolute path for uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, 'product_images'));
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const uniqueName = Date.now() + '-' + Math.round(Math.random() * 1E9) + ext;
+    cb(null, uniqueName);
+  }
+});
+
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = /jpeg|jpg|png/;
+  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+  const mimetype = allowedTypes.test(file.mimetype);
+
+  if (extname && mimetype) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only .jpg, .jpeg, .png images are allowed'));
+  }
+};
+
+const upload = multer({ storage, fileFilter });
+
+app.post('/api/upload-image', upload.single('image'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded or invalid file type.' });
+  }
+  res.json({ filePath: path.posix.join('/product_images', req.file.filename) });
+});
+
+
 app.get("/api/session", (req, res) => {
   if (req.session.user) return res.json({ user: req.session.user });
   res.status(401).json({ error: "Not logged in" });
@@ -689,28 +725,17 @@ app.delete('/api/delete-product/:productId', async (req, res) => {
 });
 
 app.post('/api/add-product', async (req, res) => {
-  const { name, description, category, price, stock = 0, popularity = 0, image_path = null } = req.body;
+  const { name, description, category_id, price, stock = 0, popularity = 0, image_path = null } = req.body;
 
-  if (!name || !category === undefined) {
+  if (!name || !category_id || !price) {
     return res.status(400).json({ error: 'Name, category, and price are required' });
   }
 
   try {
-    // Query to get category ID based on category name
-    const [categoryResult] = await pool.promise().query(
-      `SELECT id FROM categories WHERE name = ?`, [category]
-    );
-
-    if (categoryResult.length === 0) {
-      return res.status(400).json({ error: 'Category not found' });
-    }
-
-    const categoryId = categoryResult[0].id;
-
     const [result] = await pool.promise().query(
       `INSERT INTO products (name, description, category_id, price, stock, popularity, image_path)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [name, description, categoryId, price, stock, popularity, image_path]
+      [name, description, category_id, price, stock, popularity, image_path]
     );
 
     res.json({ message: 'Product added successfully', productId: result.insertId });
@@ -719,6 +744,7 @@ app.post('/api/add-product', async (req, res) => {
     res.status(500).json({ error: 'Failed to add product' });
   }
 });
+
 
 app.put('/api/update-stock/:productId', async (req, res) => {
   const { productId } = req.params;
