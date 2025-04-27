@@ -276,7 +276,7 @@ function ProductPage() {
           <ImageContainer>
 		  <Box
 			component="img"
-			src={`/${product.image_path}`}
+			src={`/${product.image_path}`.replace(/\/{2,}/g, '/')}
 			alt={product.name}
 			sx={{
 			  maxWidth: '100%',
