@@ -11,7 +11,7 @@ services:
       MYSQL_ROOT_HOST: "%"
     volumes:
       - db_data:/var/lib/mysql
-      - ./backend/mysql-init:/docker-entrypoint-initdb.d  
+      - ./backend/mysql-init:/docker-entrypoint-initdb.d
     ports:
       - "3306:3306"
 
@@ -23,7 +23,7 @@ services:
       - "5000:5000"
     volumes:
       - ./backend:/usr/src/app
-      - /usr/src/app/node_modules  # Prevent overwriting node_modules
+      - /usr/src/app/node_modules # Prevent node_modules overwriting
     working_dir: /usr/src/app
     depends_on:
       - mysql
@@ -32,7 +32,27 @@ services:
       DB_USER: root
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ecommerce
+      SESSION_SECRET: secret123 # Optional but useful
     command: npx nodemon server.js
+
+  backend-test:
+    build: ./backend
+    container_name: backend_test_container
+    restart: "no" # Important: no infinite restart after test ends
+    volumes:
+      - ./backend:/usr/src/app
+      - /usr/src/app/node_modules
+    working_dir: /usr/src/app
+    depends_on:
+      - mysql
+    environment:
+      DB_HOST: mysql
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ecommerce
+      NODE_ENV: test
+      SESSION_SECRET: testsecret # Prevent session errors
+    entrypoint: ["npm", "run", "test"]
 
   frontend:
     build: ./frontend
