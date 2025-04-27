@@ -200,7 +200,7 @@ app.get("/api/session", (req, res) => {
 
 
 app.post("/api/payment", async (req, res) => {
-  const { cardNumber, expiry, cvv, cart } = req.body;
+  const { cardNumber, expiry, cvv, cart, address} = req.body;
   const userId = req.session.user?.id;
   if (!userId) return res.status(401).json({ error: "Not logged in." });
   if (!Array.isArray(cart) || !cart.length) {
@@ -215,7 +215,7 @@ app.post("/api/payment", async (req, res) => {
     const conn = await pool.promise().getConnection();
     await conn.beginTransaction();
 
-    const [orderRes] = await conn.query("INSERT INTO orders (user_id) VALUES (?)", [userId]);
+    const [orderRes] = await conn.query("INSERT INTO orders (user_id, order_address) VALUES (?, ?)", [userId, address]);
     orderId = orderRes.insertId;
 
     for (const item of cart) {
@@ -778,7 +778,7 @@ app.put('/api/update-stock/:productId', async (req, res) => {
 app.get('/api/orders-pm', async (req, res) => {
   try {
     const [orders] = await pool.promise().query(
-      `SELECT o.id AS order_id, o.order_date, o.status, 
+      `SELECT o.id AS order_id, o.order_date, o.status, o.order_address, o.user_id,
               oi.product_id, p.name AS product_name, oi.quantity, oi.price_at_time 
        FROM orders o
        JOIN order_items oi ON oi.order_id = o.id
@@ -787,13 +787,15 @@ app.get('/api/orders-pm', async (req, res) => {
 
     // Group order items by order_id
     const detailedOrders = orders.reduce((acc, order) => {
-      const { order_id, order_date, status, product_id, product_name, quantity, price_at_time } = order;
+      const { order_id, order_date, status, order_address, user_id, product_id, product_name, quantity, price_at_time } = order;
 
       if (!acc[order_id]) {
         acc[order_id] = {
           order_id,
           order_date,
           status,
+          order_address,
+          user_id,
           items: []
         };
       }
@@ -830,5 +832,25 @@ app.put('/api/orders-pm/:orderId/status', async (req, res) => {
   } catch (err) {
     console.error('Error updating order status:', err);
     res.status(500).json({ error: 'Failed to update order status' });
+  }
+});
+
+app.delete("/api/delete-comment-pm/:commentId", async (req, res) => {
+  
+  try {
+    const [[c]] = await pool.promise().query(
+      "SELECT product_id FROM comments WHERE id = ?",
+      [req.params.commentId]
+    );
+    if (!c) return res.status(404).json({ error: "Comment not found or not authorized." });
+
+    await pool.promise().query("DELETE FROM comments WHERE id = ?", [
+      req.params.commentId
+    ]);
+
+    res.json({ message: "Comment deleted successfully." });
+  } catch (err) {
+    console.error("Delete comment error:", err);
+    res.status(500).json({ error: "Failed to delete comment and rating." });
   }
 });

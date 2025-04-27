@@ -94,7 +94,7 @@ export default function Payment() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cardNumber, expiry, cvv, cart })
+        body: JSON.stringify({ cardNumber, expiry, cvv, cart, address })
       });
       const data = await resp.json();
 
