@@ -10,5 +10,9 @@
     "react-dom": "^19.1.0",
     "react-dropzone": "^14.3.8",
     "styled-components": "^6.1.17"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^7.1.0"
   }
 }
