@@ -200,32 +200,83 @@ app.get("/api/session", (req, res) => {
 
 
 app.post("/api/payment", async (req, res) => {
-  const { cardNumber, expiry, cvv, cart, address} = req.body;
+  const { cardNumber, expiry, cvv, cart, address } = req.body;
   const userId = req.session.user?.id;
-  if (!userId) return res.status(401).json({ error: "Not logged in." });
+
+  // ─── Authentication & basic presence ───────────────────────────────────────
+  if (!userId) {
+    return res.status(401).json({ error: "Not logged in." });
+  }
   if (!Array.isArray(cart) || !cart.length) {
     return res.status(400).json({ error: "Cart is empty or invalid." });
   }
+  if (!address || !cardNumber || !expiry || !cvv) {
+    return res.status(400).json({ error: "All payment fields and address are required." });
+  }
+
+  // ─── Card number must be exactly 16 digits ─────────────────────────────────
+  if (!/^\d{16}$/.test(cardNumber)) {
+    return res.status(400).json({ error: "Card number must be 16 digits." });
+  }
+
+  // ─── CVV must be exactly 3 digits ──────────────────────────────────────────
+  if (!/^\d{3}$/.test(cvv)) {
+    return res.status(400).json({ error: "CVV must be 3 digits." });
+  }
+
+  // ─── Expiry date format & range check: MM/YY ────────────────────────────────
+  const parts = expiry.split("/");
+  if (parts.length !== 2) {
+    return res.status(400).json({ error: "Invalid expiry format. Use MM/YY." });
+  }
+  const month = parseInt(parts[0], 10);
+  const year2 = parseInt(parts[1], 10);
+  if (
+    isNaN(month) || isNaN(year2) ||
+    month < 1 || month > 12 ||
+    parts[1].length !== 2
+  ) {
+    return res.status(400).json({ error: "Invalid expiry. Month must be 01–12 and year two digits." });
+  }
+  const fullYear  = 2000 + year2;
+  const now       = new Date();
+  const thisYear  = now.getFullYear();
+  const thisMonth = now.getMonth() + 1;
+  if (fullYear < thisYear || (fullYear === thisYear && month < thisMonth)) {
+    return res.status(400).json({ error: "Card has expired." });
+  }
+
+  // ─── (Optional) test‐card decline ─────────────────────────────────────────────
   if (cardNumber === "0000000000000000") {
     return res.status(400).json({ message: "Payment declined: Invalid card." });
   }
 
+  // ─── Create order & deduct stock ─────────────────────────────────────────────
   let orderId;
   try {
     const conn = await pool.promise().getConnection();
     await conn.beginTransaction();
 
-    const [orderRes] = await conn.query("INSERT INTO orders (user_id, order_address) VALUES (?, ?)", [userId, address]);
+    const [orderRes] = await conn.query(
+      "INSERT INTO orders (user_id, order_address) VALUES (?, ?)",
+      [userId, address]
+    );
     orderId = orderRes.insertId;
 
     for (const item of cart) {
-      const [[prod]] = await conn.query("SELECT stock,price FROM products WHERE id = ?", [item.id]);
+      const [[prod]] = await conn.query(
+        "SELECT stock, price FROM products WHERE id = ?",
+        [item.id]
+      );
       if (!prod || prod.stock < item.quantity) {
         throw new Error(`Invalid stock for product ${item.id}`);
       }
-      await conn.query("UPDATE products SET stock = ? WHERE id = ?", [prod.stock - item.quantity, item.id]);
       await conn.query(
-        "INSERT INTO order_items (order_id,product_id,quantity,price_at_time) VALUES (?,?,?,?)",
+        "UPDATE products SET stock = ? WHERE id = ?",
+        [prod.stock - item.quantity, item.id]
+      );
+      await conn.query(
+        "INSERT INTO order_items (order_id, product_id, quantity, price_at_time) VALUES (?,?,?,?)",
         [orderId, item.id, item.quantity, prod.price]
       );
     }
@@ -237,39 +288,77 @@ app.post("/api/payment", async (req, res) => {
     return res.status(500).json({ error: "Failed to place order." });
   }
 
-  // Respond immediately
+  // ─── Synchronously generate the invoice PDF ─────────────────────────────────
+  try {
+    // Build invoice items
+    const invoiceItems = await Promise.all(
+      cart.map(async i => {
+        const [[prod]] = await pool
+          .promise()
+          .query(
+            "SELECT model, serial_number, distributor_info FROM products WHERE id = ?",
+            [i.id]
+          );
+        return {
+          name:         i.name,
+          distributor:  prod.distributor_info,
+          model:        prod.model,
+          serialNumber: prod.serial_number,
+          qty:          Number(i.quantity),
+          price:        Number(i.price),
+          total:        Number(i.quantity) * Number(i.price),
+        };
+      })
+    );
+
+    const totalAmount = invoiceItems.reduce((sum, it) => sum + it.total, 0);
+    const invoicePath = path.join(invoicesDir, `invoice_${orderId}.pdf`);
+
+    // Wait for PDF to be written before responding
+    await generateInvoice(
+      {
+        id:           orderId,
+        customerName: req.session.user.name,
+        address:      address,
+        brand:        process.env.BRAND_NAME || "My Shop",
+        serialNumber: `INV-${orderId}`,
+        items:        invoiceItems,
+        total:        totalAmount,
+      },
+      invoicePath
+    );
+  } catch (err) {
+    console.error("Invoice generation error:", err);
+    // proceed—user gets orderId even if invoice fails
+  }
+
+  // ─── Respond immediately with orderId ────────────────────────────────────────
   res.json({ message: "Order placed successfully", orderId });
 
-  // Fire-and-forget invoice + email
+  // ─── Fire‐and‐forget: read PDF & email ────────────────────────────────────────
   (async () => {
     try {
-      const invoiceItems = cart.map(i => ({ name: i.name, qty: Number(i.quantity), price: Number(i.price) }));
-      const totalAmount = invoiceItems.reduce((sum, i) => sum + i.qty * i.price, 0);
       const invoicePath = path.join(invoicesDir, `invoice_${orderId}.pdf`);
+      const pdfBuffer   = fs.readFileSync(invoicePath);
 
-      await generateInvoice(
-        { id: orderId, customerName: req.session.user.name, items: invoiceItems, total: totalAmount },
-        invoicePath
-      );
-
-      const pdfBuffer = fs.readFileSync(invoicePath);
-      const data = {
+      mg.messages().send({
         from:       process.env.EMAIL_FROM,
         to:         req.session.user.email,
         subject:    `Your Invoice #${orderId}`,
         text:       "Thank you for your purchase! Your invoice is attached.",
         attachment: pdfBuffer
-      };
-
-      mg.messages().send(data, (err, body) => {
+      }, (err, body) => {
         if (err) console.error("Mailgun error:", err);
-        else console.log("Invoice emailed via Mailgun:", body.id);
+        else    console.log("Invoice emailed via Mailgun:", body.id);
       });
-    } catch (e) {
-      console.error("Invoice/email background error:", e);
+    } catch (err) {
+      console.error("Invoice/email background error:", err);
     }
   })();
 });
+
+
+
 app.get("/api/orders", async (req, res) => {
   const userId = req.session.user?.id;
   if (!userId) return res.status(401).json({ error: "Not logged in" });
