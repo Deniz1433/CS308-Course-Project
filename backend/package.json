@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest",
     "start": "node server.js"
   },
   "keywords": [],
@@ -20,11 +20,13 @@
     "express-validator": "^7.2.1",
     "jsonwebtoken": "^9.0.2",
     "mailgun-js": "^0.22.0",
+    "multer": "^1.4.5-lts.1",
     "mysql2": "^3.13.0",
-    "pdfkit": "^0.17.0",
-    "multer": "^1.4.5-lts.1"
+    "pdfkit": "^0.17.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.9"
+    "jest": "^29.7.0",
+    "nodemon": "^3.1.9",
+    "supertest": "^7.1.0"
   }
 }
