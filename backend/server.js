@@ -58,7 +58,7 @@ app.get("/api/products/:id", (req, res) => {
 });
 
 app.get("/api/categories", (req, res) => {
-  pool.query("SELECT * FROM categories", (err, results) => {
+  pool.query("SELECT * FROM categories where is_active = TRUE", (err, results) => {
     if (err) return res.status(500).json({ error: "Database error" });
     res.json(results);
   });
@@ -725,17 +725,32 @@ app.delete('/api/delete-product/:productId', async (req, res) => {
 });
 
 app.post('/api/add-product', async (req, res) => {
-  const { name, description, category_id, price, stock = 0, popularity = 0, image_path = null } = req.body;
+  const {
+    name,
+    model,
+    serial_number,
+    description,
+    category_id,
+    price,
+    stock = 0,
+    warranty_status = 'No Warranty',
+    distributor_info = '',
+    image_path = null,
+    popularity = 0
+  } = req.body;
 
+  // Validate required fields
   if (!name || !category_id || !price) {
     return res.status(400).json({ error: 'Name, category, and price are required' });
   }
 
   try {
+
+    // Insert the product into the products table
     const [result] = await pool.promise().query(
-      `INSERT INTO products (name, description, category_id, price, stock, popularity, image_path)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [name, description, category_id, price, stock, popularity, image_path]
+      `INSERT INTO products (name, model, serial_number, description, category_id, price, stock, warranty_status, distributor_info, image_path, popularity)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [name, model, serial_number, description, category_id, price, stock, warranty_status, distributor_info, image_path, popularity]
     );
 
     res.json({ message: 'Product added successfully', productId: result.insertId });
@@ -854,3 +869,55 @@ app.delete("/api/delete-comment-pm/:commentId", async (req, res) => {
     res.status(500).json({ error: "Failed to delete comment and rating." });
   }
 });
+
+app.post('/api/add-category', async (req, res) => {
+  const { name } = req.body;
+
+  if (!name) {
+    return res.status(400).json({ error: 'Category name is required' });
+  }
+
+  try {
+    await pool.promise().query(
+      'INSERT INTO categories (name) VALUES (?)',
+      [name]
+    );
+
+    res.json({ message: 'Category added successfully.' });
+  } catch (err) {
+    console.error('Error adding category:', err);
+    if (err.code === 'ER_DUP_ENTRY') {
+      res.status(400).json({ error: 'Category name must be unique' });
+    } else {
+      res.status(500).json({ error: 'Failed to add category' });
+    }
+  }
+});
+
+app.delete('/api/delete-category/:categoryId', async (req, res) => {
+  const { categoryId } = req.params;
+
+  try {
+    // First, deactivate all products in that category
+    await pool.promise().query(
+      'UPDATE products SET is_active = 0 WHERE category_id = ?',
+      [categoryId]
+    );
+
+    // Then delete the category
+    const [result] = await pool.promise().query(
+      'UPDATE categories SET is_active = 0 WHERE id = ?',
+      [categoryId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Category not found' });
+    }
+
+    res.json({ message: 'Category deleted & all related products deactivated.' });
+  } catch (err) {
+    console.error('Error deleting category:', err);
+    res.status(500).json({ error: 'Failed to delete category' });
+  }
+});
+
