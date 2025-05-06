@@ -38,6 +38,85 @@ const pool = mysql.createPool({
   queueLimit: 0,
 });
 
+function requireSalesManager(req, res, next) {
+    const user = req.session.user;
+    if (!user || !user.roles || !user.roles.includes("sales_manager")) {
+        return res.status(403).json({ error: "Access denied" });
+    }
+    next();
+}
+
+const requireAuth = (req, res, next) => {
+    // TEMP: allow all requests through for now
+    next();
+};
+
+app.get("/api/products", requireAuth, (req, res) => {
+    const { unpricedOnly } = req.query;
+
+    let sql = "SELECT * FROM products WHERE is_active = TRUE";
+    const params = [];
+
+    if (unpricedOnly === "true") {
+        sql += " AND (price IS NULL OR price = 0)";
+    }
+
+    pool.query(sql, params, (err, results) => {
+        if (err) return res.status(500).json({ error: "Database error" });
+        res.json(results);
+    });
+});
+
+app.put("/api/set-price/:id", requireSalesManager, (req, res) => {
+    const id = Number(req.params.id);
+    const { price } = req.body;
+
+    if (isNaN(id) || price == null || isNaN(price) || price <= 0) {
+        return res.status(400).json({ error: "Invalid product ID or price" });
+    }
+
+    const sql = "UPDATE products SET price = ? WHERE id = ? AND is_active = TRUE";
+    pool.query(sql, [price, id], (err, result) => {
+        if (err) return res.status(500).json({ error: "Database error" });
+        if (result.affectedRows === 0) return res.status(404).json({ error: "Product not found or inactive" });
+        res.json({ message: "Price updated successfully" });
+    });
+});
+
+app.put("/api/apply-discount/:id", requireSalesManager, async (req, res) => {
+    const productId = Number(req.params.id);
+    const { discountRate } = req.body;
+
+    if (isNaN(productId) || discountRate == null || isNaN(discountRate) || discountRate <= 0 || discountRate >= 100) {
+        return res.status(400).json({ error: "Invalid product ID or discount rate" });
+    }
+
+    try {
+        // Get current price
+        const [rows] = await pool.promise().query(
+            "SELECT price FROM products WHERE id = ? AND is_active = TRUE",
+            [productId]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: "Product not found or inactive" });
+        }
+
+        const currentPrice = rows[0].price;
+        const discountedPrice = currentPrice * (1 - discountRate / 100);
+
+        await pool.promise().query(
+            "UPDATE products SET price = ? WHERE id = ? AND is_active = TRUE",
+            [discountedPrice, productId]
+        );
+
+        res.json({ message: "Discount applied successfully", newPrice: discountedPrice });
+    } catch (err) {
+        console.error("Database error:", err);
+        res.status(500).json({ error: "Database error" });
+    }
+});
+
 // ----- PRODUCT ROUTES -----
 
 app.get("/api/products", (req, res) => {

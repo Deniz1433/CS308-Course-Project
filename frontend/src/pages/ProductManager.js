@@ -256,10 +256,10 @@ const ProductManager = () => {
 
   const handleAddProduct = async () => {
 
-  const { name, category_id, price } = newProduct;
+  const { name, category_id } = newProduct;
 
-  if (!name || !category_id || !price) {
-    alert('Please enter product name, category, and price');
+  if (!name || !category_id ) {
+    alert('Please enter product name and category');
     return;
   }
 
