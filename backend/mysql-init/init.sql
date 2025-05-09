@@ -154,6 +154,9 @@ ADD COLUMN approved BOOLEAN DEFAULT FALSE;
 ALTER TABLE products
 ADD COLUMN is_active BOOLEAN DEFAULT TRUE;
 
+ALTER TABLE categories
+ADD COLUMN is_active BOOLEAN DEFAULT TRUE;
+
 -- Link users and their roles
 ALTER TABLE users ADD COLUMN role_id INT DEFAULT NULL, ADD FOREIGN KEY (role_id) REFERENCES roles(id);
 
