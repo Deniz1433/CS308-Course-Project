@@ -2,6 +2,8 @@
 import React, { useEffect, useState, useContext } from 'react';
 import { SessionContext } from '../middleware/SessionManager';
 import { useNavigate } from 'react-router-dom';
+import { styled } from '@mui/material/styles';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import {
   Container,
   Typography,
@@ -17,6 +19,10 @@ const Orders = () => {
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const BackContainer = styled(Box)(({ theme }) => ({
+  marginBottom: theme.spacing(2),
+}));
+
 
   useEffect(() => {
     if (!user) {
@@ -57,6 +63,15 @@ const Orders = () => {
 
   return (
     <Container sx={{ mt: 6 }}>
+		<BackContainer>
+		<Button
+		  startIcon={<ArrowBackIcon />}
+		  onClick={() => navigate('/')}
+		  variant="outlined"
+		>
+		  Back to Products
+		</Button>
+	  </BackContainer>
       <Typography variant="h4" gutterBottom>Your Orders</Typography>
       {orders.length === 0 ? (
         <Typography>No orders found.</Typography>
