@@ -138,6 +138,8 @@ CREATE TABLE IF NOT EXISTS wishlists (
 ) ENGINE=InnoDB;
 
 
+ALTER TABLE products MODIFY price DECIMAL(10,2) DEFAULT NULL;
+
 -- Add a column for cost (for profit/loss calculations)
 ALTER TABLE products
 ADD COLUMN cost DECIMAL(10,2) DEFAULT NULL;

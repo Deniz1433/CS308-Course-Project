@@ -276,65 +276,81 @@ const ProductManager = () => {
   };
 
   const handleAddProduct = async () => {
-    const { name, model, serial_number, description, category_id, price, stock, warranty_status, distributor_info, image_path, popularity } = newProduct;
-  
-    if (!name || !category_id || !price) {
-      alert('Please enter product name, category, and price');
-      return;
-    }
-  
-    if (isNaN(price) || price <= 0) {
-      alert('Please enter a valid price greater than 0');
-      return;
-    }
-  
-    try {
-      const response = await fetch('/api/add-product', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...newProduct,
-          price: parseFloat(price),
-          stock: stock ? parseInt(stock) : 0,
-          popularity: popularity ? parseInt(popularity) : 0,
-        }),
-      });
-  
-      if (response.ok) {
-        const result = await response.json();
-        const addedProduct = {
-          id: result.productId,
-          ...newProduct,
-          price: parseFloat(price),
-          stock: stock ? parseInt(stock) : 0,
-          popularity: popularity ? parseInt(popularity) : 0,
-        };
-  
-        setProducts(prevProducts => [...prevProducts, addedProduct]);
-        setNewProduct({
-          name: '',
-          model: '',
-          serial_number: '',
-          description: '',
-          category_id: '',
-          price: '',
-          stock: '',
-          popularity: '',
-          warranty_status: '',
-          distributor_info: '',
-          image_path: '',
-        });
-        alert('Product added successfully');
-      } else {
-        const result = await response.json();
-        alert(result.error || 'Failed to add product');
-      }
-    } catch (err) {
-      console.error('Error adding product:', err);
-      alert('An error occurred while adding the product');
-    }
-  };
+  const {
+    name,
+    model,
+    serial_number,
+    description,
+    category_id,
+    price,
+    stock,
+    warranty_status,
+    distributor_info,
+    image_path,
+    popularity
+  } = newProduct;
 
+  if (!name || !category_id || !price) {
+    alert('Please enter product name, category, and price');
+    return;
+  }
+  if (isNaN(price) || parseFloat(price) <= 0) {
+    alert('Please enter a valid price greater than 0');
+    return;
+  }
+
+  try {
+    const response = await fetch('/api/add-product', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...newProduct,
+        price: parseFloat(price),
+        stock: stock ? parseInt(stock, 10) : 0,
+        popularity: popularity ? parseInt(popularity, 10) : 0,
+      }),
+    });
+    const result = await response.json();
+
+    if (response.ok) {
+      const addedProduct = {
+        id: result.productId,
+        name,
+        model,
+        serial_number,
+        description,
+        category_id,
+        price: parseFloat(price),
+        stock: stock ? parseInt(stock, 10) : 0,
+        warranty_status,
+        distributor_info,
+        image_path,
+        popularity: popularity ? parseInt(popularity, 10) : 0,
+      };
+
+      setProducts(prev => [...prev, addedProduct]);
+      setNewProduct({
+        name: '',
+        model: '',
+        serial_number: '',
+        description: '',
+        category_id: '',
+        price: '',
+        stock: '',
+        warranty_status: '',
+        distributor_info: '',
+        image_path: '',
+        popularity: '',
+      });
+      alert('Product added successfully');
+    } else {
+      alert(result.error || 'Failed to add product');
+    }
+  } catch (err) {
+    console.error('Error adding product:', err);
+    alert('An error occurred while adding the product');
+  }
+};
 
 
   const handleUpdateStock = async (productId, newStock) => {
