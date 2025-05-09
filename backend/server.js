@@ -54,7 +54,7 @@ const requireAuth = (req, res, next) => {
 app.get("/api/products", requireAuth, (req, res) => {
     const { unpricedOnly } = req.query;
 
-    let sql = "SELECT * FROM products WHERE is_active = TRUE";
+    let sql = "SELECT * FROM products WHERE price IS NOT NULL AND is_active = TRUE";
     const params = [];
 
     if (unpricedOnly === "true") {
@@ -65,6 +65,18 @@ app.get("/api/products", requireAuth, (req, res) => {
         if (err) return res.status(500).json({ error: "Database error" });
         res.json(results);
     });
+});
+
+app.get('/api/unpriced-products', requireSalesManager, async (req, res) => {
+  try {
+    const [rows] = await pool.promise().query(
+      `SELECT * FROM products WHERE price IS NULL OR is_active = FALSE`
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching unpriced products:', err);
+    res.status(500).json({ error: 'Failed to fetch unpriced products' });
+  }
 });
 
 app.put("/api/set-price/:id", requireSalesManager, (req, res) => {
@@ -897,7 +909,7 @@ app.post('/api/add-product', async (req, res) => {
     name,
     description = null,
     category_id,
-    price,
+    price = null,
     stock = 0,
     popularity = 0,
     image_path = null,
@@ -907,8 +919,8 @@ app.post('/api/add-product', async (req, res) => {
     distributor_info = 'N/A'
   } = req.body;
 
-  if (!name || !category_id || !price) {
-    return res.status(400).json({ error: 'Name, category, and price are required' });
+  if (!name || !category_id) {
+    return res.status(400).json({ error: 'Name, category are required' });
   }
 
   try {

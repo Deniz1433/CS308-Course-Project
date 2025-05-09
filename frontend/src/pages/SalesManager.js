@@ -4,6 +4,7 @@ import {
     AccordionSummary, AccordionDetails, CircularProgress
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import { useNavigate } from 'react-router-dom';
 
 const SalesManager = () => {
     const [products, setProducts] = useState([]);
@@ -12,6 +13,7 @@ const SalesManager = () => {
     const [priceUpdates, setPriceUpdates] = useState({});
     const [discountRates, setDiscountRates] = useState({});
     const [updating, setUpdating] = useState({});
+    const navigate = useNavigate();
 
     useEffect(() => {
         fetchUnpricedProducts();
@@ -124,12 +126,21 @@ const SalesManager = () => {
 
     return (
         <Box p={3}>
+            <Button
+                variant="contained"
+                color="primary"
+                onClick={() => navigate('/unpriced-products')}
+                style={{ marginBottom: '10px' }}
+            >
+                View Unpriced Products
+            </Button>
+
             <Typography variant="h4" gutterBottom>
-                Products Awaiting Pricing
+                Products 
             </Typography>
 
             {products.length === 0 ? (
-                <Typography>No products require pricing at the moment.</Typography>
+                <Typography>No products </Typography>
             ) : (
                 products.map(product => (
                     <Accordion
