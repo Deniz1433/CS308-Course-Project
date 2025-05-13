@@ -137,8 +137,9 @@ CREATE TABLE IF NOT EXISTS wishlists (
   FOREIGN KEY (product_id) REFERENCES products(id)
 ) ENGINE=InnoDB;
 
-
 ALTER TABLE products MODIFY price DECIMAL(10,2) DEFAULT NULL;
+ALTER TABLE products ADD final_price DECIMAL(10,2) DEFAULT NULL;
+ALTER TABLE products ADD discount_rate DECIMAL(5, 2) DEFAULT 0;
 
 -- Add a column for cost (for profit/loss calculations)
 ALTER TABLE products

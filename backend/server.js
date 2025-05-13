@@ -104,25 +104,58 @@ app.put("/api/apply-discount/:id", requireSalesManager, async (req, res) => {
     }
 
     try {
-        // Get current price
+        // Get original price
+        const [rows] = await pool.promise().query(
+            'SELECT price FROM products WHERE id = ? AND is_active = TRUE', [productId]
+        );
+
+        const originalPrice = rows[0]?.price;
+        if (!originalPrice) {
+            return res.status(400).json({ error: 'Product not found or price not set' });
+        }
+
+        // Calculate discounted price
+        const finalPrice = (originalPrice * (1 - discountRate / 100)).toFixed(2);
+
+        // Update final price in DB
+        await pool.promise().query(
+            'UPDATE products SET final_price = ?, discount_rate = ? WHERE id = ? AND is_active = TRUE',
+            [finalPrice, discountRate, productId]
+        );
+
+        res.json({ message: 'Discount applied', final_price: finalPrice });
+    } catch (err) {
+        console.error('Error applying discount:', err);
+        res.status(500).json({ error: 'Failed to apply discount' });
+    }
+});
+
+app.put("/api/cancel-discount/:id", requireSalesManager, async (req, res) => {
+    const productId = Number(req.params.id);
+
+    if (isNaN(productId)) {
+        return res.status(400).json({ error: "Invalid product ID" });
+    }
+
+    try {
+        // Get base price
         const [rows] = await pool.promise().query(
             "SELECT price FROM products WHERE id = ? AND is_active = TRUE",
             [productId]
         );
 
-        if (rows.length === 0) {
-            return res.status(404).json({ error: "Product not found or inactive" });
+        if (rows.length === 0 || !rows[0].price) {
+            return res.status(404).json({ error: "Product not found or base price not set" });
         }
 
-        const currentPrice = rows[0].price;
-        const discountedPrice = currentPrice * (1 - discountRate / 100);
+        const basePrice = rows[0].price;
 
         await pool.promise().query(
-            "UPDATE products SET price = ? WHERE id = ? AND is_active = TRUE",
-            [discountedPrice, productId]
+            "UPDATE products SET price = ?, final_price = ? WHERE id = ? AND is_active = TRUE",
+            [basePrice, basePrice, productId]
         );
 
-        res.json({ message: "Discount applied successfully", newPrice: discountedPrice });
+        res.json({ message: "Discount canceled", restoredPrice: basePrice });
     } catch (err) {
         console.error("Database error:", err);
         res.status(500).json({ error: "Database error" });
@@ -920,8 +953,8 @@ app.post('/api/add-product', async (req, res) => {
     distributor_info = 'N/A'
   } = req.body;
 
-  if (!name || !category_id || !price) {
-    return res.status(400).json({ error: 'Name, category, and price are required' });
+  if (!name || !category_id) {
+    return res.status(400).json({ error: 'Name, category are required' });
   }
 
   try {

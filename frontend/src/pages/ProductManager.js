@@ -290,12 +290,8 @@ const ProductManager = () => {
     popularity
   } = newProduct;
 
-  if (!name || !category_id || !price) {
-    alert('Please enter product name, category, and price');
-    return;
-  }
-  if (isNaN(price) || parseFloat(price) <= 0) {
-    alert('Please enter a valid price greater than 0');
+  if (!name || !category_id) {
+    alert('Please enter product name, category');
     return;
   }
 
@@ -679,8 +675,7 @@ const ProductManager = () => {
                     
                     <Grid item xs={12} sm={6}>
                       <TextField
-                        fullWidth
-                        required
+                        fullWidth                        
                         label="Price ($)"
                         type="number"
                         value={newProduct.price}

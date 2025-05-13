@@ -26,6 +26,7 @@ import Card from '@mui/material/Card';
 import CardMedia from '@mui/material/CardMedia';
 import CardContent from '@mui/material/CardContent';
 import CardActions from '@mui/material/CardActions';
+import { Chip } from '@mui/material';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
@@ -179,25 +180,43 @@ function ProductCardItem({ product, onAdd, onView, quantity, cartQuantity, onInc
 
   return (
     <ProductCard>
-      <CardMedia
-		  component="img"
-		  image={product.image_path}
-		  alt={product.name}
-		  height={140}
-		  onClick={() => onView(product.id)}
-		  sx={{
-			cursor: 'pointer',
-			objectFit: 'contain',
-			backgroundColor: '#fff',
-			filter: product.stock === 0 ? 'grayscale(100%)' : 'none',
-			opacity: product.stock === 0 ? 0.7 : 1,
-			transition: 'filter 0.3s, opacity 0.3s',
-			'&:hover': {
-			  filter: 'none',
-			  opacity: 1,
-			},
-		  }}
-		/>
+        <Box sx={{ position: 'relative' }}>
+            <CardMedia
+                component="img"
+                image={product.image_path}
+                alt={product.name}
+                height={140}
+                onClick={() => onView(product.id)}
+                sx={{
+                    cursor: 'pointer',
+                    objectFit: 'contain',
+                    backgroundColor: '#fff',
+                    filter: product.stock === 0 ? 'grayscale(100%)' : 'none',
+                    opacity: product.stock === 0 ? 0.7 : 1,
+                    transition: 'filter 0.3s, opacity 0.3s',
+                    '&:hover': {
+                        filter: 'none',
+                        opacity: 1,
+                    },
+                }}
+            />
+
+            {/* 🟥 Discount Badge */}
+            {product.final_price && product.final_price < product.price && (
+                <Chip
+                    label={`-${Math.round(100 * (1 - product.final_price / product.price))}%`}
+                    color="error"
+                    size="small"
+                    sx={{
+                        position: 'absolute',
+                        top: 8,
+                        right: 8,
+                        fontWeight: 'bold',
+                    }}
+                />
+            )}
+        </Box>
+
       <CardContent>
         <Typography gutterBottom variant="h5">
           {product.name}
@@ -205,9 +224,22 @@ function ProductCardItem({ product, onAdd, onView, quantity, cartQuantity, onInc
         <Typography variant="body2" color="text.secondary">
           {product.description}
         </Typography>
-        <Typography variant="body1" sx={{ mt: 1 }}>
-          Price: ${Number(product.price).toFixed(2)}
-        </Typography>
+
+        {product.final_price && product.final_price < product.price ? (
+            <Box sx={{ mt: 1 }}>
+                <Typography variant="body2" sx={{ textDecoration: 'line-through', color: 'gray' }}>
+                    ${Number(product.price).toFixed(2)}
+                </Typography>
+                <Typography variant="body1" color="primary">
+                    ${Number(product.final_price).toFixed(2)}
+                </Typography>
+            </Box>
+        ) : (
+            <Typography variant="body1" sx={{ mt: 1 }}>
+                Price: ${Number(product.price).toFixed(2)}
+            </Typography>
+        )}
+
         <Typography variant="body2" color="text.secondary">
           Stock: {product.stock}
         </Typography>
