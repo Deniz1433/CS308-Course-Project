@@ -94,14 +94,25 @@ const SalesManager = () => {
             });
 
             if (response.ok) {
-                const final_price = (
-                    (priceUpdates[productId] || products.find(p => p.id === productId)?.price || 0) *
-                    (1 - rate / 100)
-                ).toFixed(2);
+                const product = products.find(p => p.id === productId);
+                const basePrice = parseFloat(
+                    priceUpdates[productId] ?? product?.price
+                );
 
-                setProducts(prev => prev.map(p =>
-                    p.id === productId ? { ...p, final_price } : p
-                ));
+                if (isNaN(basePrice) || basePrice <= 0) {
+                    alert("Invalid base price for discount calculation");
+                    return;
+                }
+
+                const final_price = (basePrice * (1 - rate / 100)).toFixed(2);
+
+                setProducts(prev =>
+                    prev.map(p =>
+                        p.id === productId
+                            ? { ...p, price: basePrice, final_price: final_price }
+                            : p
+                    )
+                );
 
                 alert('Discount applied successfully');
             } else {
@@ -115,6 +126,37 @@ const SalesManager = () => {
             setUpdating(prev => ({ ...prev, [productId]: false }));
         }
     };
+
+    const handleCancelDiscount = async (productId) => {
+        setUpdating(prev => ({ ...prev, [productId]: true }));
+
+        try {
+            const response = await fetch(`/api/cancel-discount/${productId}`, {
+                method: 'PUT',
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                setProducts(prev =>
+                    prev.map(p =>
+                        p.id === productId
+                            ? { ...p, price: data.restoredPrice, final_price: data.restoredPrice }
+                            : p
+                    )
+                );
+                alert('Discount canceled successfully');
+            } else {
+                const result = await response.json();
+                alert(result.error || 'Failed to cancel discount');
+            }
+        } catch (err) {
+            console.error('Error canceling discount:', err);
+            alert('An error occurred while canceling the discount');
+        } finally {
+            setUpdating(prev => ({ ...prev, [productId]: false }));
+        }
+    };
+
 
     if (loading) {
         return (
@@ -153,7 +195,11 @@ const SalesManager = () => {
                         </AccordionSummary>
                         <AccordionDetails>
                             <Typography>Description: {product.description}</Typography>
-                            <Typography>Category: {product.category}</Typography>
+                            {product.price && (
+                                <Typography sx={{ mt: 1 }}>
+                                    Original Price: <strong>${product.price}</strong>
+                                </Typography>
+                            )}
                             {product.final_price && (
                                 <Typography sx={{ mt: 1 }}>
                                     Final Price: <strong>${product.final_price}</strong>
@@ -203,6 +249,18 @@ const SalesManager = () => {
                                     {updating[product.id] ? 'Applying...' : 'Apply Discount'}
                                 </Button>
                             </Box>
+
+                            <Box mt={1}>
+                                <Button
+                                    variant="outlined"
+                                    color="error"
+                                    disabled={updating[product.id]}
+                                    onClick={() => handleCancelDiscount(product.id)}
+                                >
+                                    {updating[product.id] ? 'Cancelling...' : 'Cancel Discount'}
+                                </Button>
+                            </Box>
+
                         </AccordionDetails>
                     </Accordion>
                 ))
