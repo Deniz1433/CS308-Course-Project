@@ -96,7 +96,7 @@ const SalesManager = () => {
             if (response.ok) {
                 const product = products.find(p => p.id === productId);
                 const basePrice = parseFloat(
-                    priceUpdates[productId] ?? product?.price
+                    product?.price
                 );
 
                 if (isNaN(basePrice) || basePrice <= 0) {
