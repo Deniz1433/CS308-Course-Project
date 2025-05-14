@@ -79,7 +79,7 @@ app.get('/api/unpriced-products', requireSalesManager, async (req, res) => {
   }
 });
 
-app.put("/api/set-price/:id", requireSalesManager, (req, res) => {
+app.put("/api/set-price/:id", requireSalesManager, async (req, res) => {
     const id = Number(req.params.id);
     const { price } = req.body;
 
@@ -87,13 +87,39 @@ app.put("/api/set-price/:id", requireSalesManager, (req, res) => {
         return res.status(400).json({ error: "Invalid product ID or price" });
     }
 
-    const sql = "UPDATE products SET price = ? WHERE id = ? AND is_active = TRUE";
-    pool.query(sql, [price, id], (err, result) => {
-        if (err) return res.status(500).json({ error: "Database error" });
-        if (result.affectedRows === 0) return res.status(404).json({ error: "Product not found or inactive" });
-        res.json({ message: "Price updated successfully" });
-    });
+    try {
+        // First check if a discount already exists
+        const [rows] = await pool.promise().query(
+            "SELECT discount_rate FROM products WHERE id = ? AND is_active = TRUE",
+            [id]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: "Product not found or inactive" });
+        }
+
+        const discountRate = rows[0].discount_rate;
+
+        let finalPrice = price;
+
+        // If there's already a discount applied, re-calculate final_price
+        if (discountRate && discountRate > 0) {
+            finalPrice = (price * (1 - discountRate / 100)).toFixed(2);
+        }
+
+        // Update both price and final_price
+        await pool.promise().query(
+            "UPDATE products SET price = ?, final_price = ? WHERE id = ? AND is_active = TRUE",
+            [price, finalPrice, id]
+        );
+
+        res.json({ message: "Price and final price updated successfully" });
+    } catch (err) {
+        console.error("Database error:", err);
+        res.status(500).json({ error: "Database error" });
+    }
 });
+
 
 app.put("/api/apply-discount/:id", requireSalesManager, async (req, res) => {
     const productId = Number(req.params.id);
