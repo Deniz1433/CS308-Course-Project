@@ -38,6 +38,156 @@ const pool = mysql.createPool({
   queueLimit: 0,
 });
 
+function requireSalesManager(req, res, next) {
+    const user = req.session.user;
+    if (!user || !user.roles || !user.roles.includes("sales_manager")) {
+        return res.status(403).json({ error: "Access denied" });
+    }
+    next();
+}
+
+const requireAuth = (req, res, next) => {
+    // TEMP: allow all requests through for now
+    next();
+};
+
+app.get("/api/products", requireAuth, (req, res) => {
+    const { unpricedOnly } = req.query;
+
+    let sql = "SELECT * FROM products WHERE price IS NOT NULL AND is_active = TRUE";
+    const params = [];
+
+    if (unpricedOnly === "true") {
+        sql += " AND (price IS NULL OR price = 0)";
+    }
+
+    pool.query(sql, params, (err, results) => {
+        if (err) return res.status(500).json({ error: "Database error" });
+        res.json(results);
+    });
+});
+
+app.get('/api/unpriced-products', requireSalesManager, async (req, res) => {
+  try {
+    const [rows] = await pool.promise().query(
+      `SELECT * FROM products WHERE price IS NULL OR is_active = FALSE`
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching unpriced products:', err);
+    res.status(500).json({ error: 'Failed to fetch unpriced products' });
+  }
+});
+
+app.put("/api/set-price/:id", requireSalesManager, async (req, res) => {
+    const id = Number(req.params.id);
+    const { price } = req.body;
+
+    if (isNaN(id) || price == null || isNaN(price) || price <= 0) {
+        return res.status(400).json({ error: "Invalid product ID or price" });
+    }
+
+    try {
+        // First check if a discount already exists
+        const [rows] = await pool.promise().query(
+            "SELECT discount_rate FROM products WHERE id = ? AND is_active = TRUE",
+            [id]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: "Product not found or inactive" });
+        }
+
+        const discountRate = rows[0].discount_rate;
+
+        let finalPrice = price;
+
+        // If there's already a discount applied, re-calculate final_price
+        if (discountRate && discountRate > 0) {
+            finalPrice = (price * (1 - discountRate / 100)).toFixed(2);
+        }
+
+        // Update both price and final_price
+        await pool.promise().query(
+            "UPDATE products SET price = ?, final_price = ? WHERE id = ? AND is_active = TRUE",
+            [price, finalPrice, id]
+        );
+
+        res.json({ message: "Price and final price updated successfully" });
+    } catch (err) {
+        console.error("Database error:", err);
+        res.status(500).json({ error: "Database error" });
+    }
+});
+
+
+app.put("/api/apply-discount/:id", requireSalesManager, async (req, res) => {
+    const productId = Number(req.params.id);
+    const { discountRate } = req.body;
+
+    if (isNaN(productId) || discountRate == null || isNaN(discountRate) || discountRate <= 0 || discountRate >= 100) {
+        return res.status(400).json({ error: "Invalid product ID or discount rate" });
+    }
+
+    try {
+        // Get original price
+        const [rows] = await pool.promise().query(
+            'SELECT price FROM products WHERE id = ? AND is_active = TRUE', [productId]
+        );
+
+        const originalPrice = rows[0]?.price;
+        if (!originalPrice) {
+            return res.status(400).json({ error: 'Product not found or price not set' });
+        }
+
+        // Calculate discounted price
+        const finalPrice = (originalPrice * (1 - discountRate / 100)).toFixed(2);
+
+        // Update final price in DB
+        await pool.promise().query(
+            'UPDATE products SET final_price = ?, discount_rate = ? WHERE id = ? AND is_active = TRUE',
+            [finalPrice, discountRate, productId]
+        );
+
+        res.json({ message: 'Discount applied', final_price: finalPrice });
+    } catch (err) {
+        console.error('Error applying discount:', err);
+        res.status(500).json({ error: 'Failed to apply discount' });
+    }
+});
+
+app.put("/api/cancel-discount/:id", requireSalesManager, async (req, res) => {
+    const productId = Number(req.params.id);
+
+    if (isNaN(productId)) {
+        return res.status(400).json({ error: "Invalid product ID" });
+    }
+
+    try {
+        // Get base price
+        const [rows] = await pool.promise().query(
+            "SELECT price FROM products WHERE id = ? AND is_active = TRUE",
+            [productId]
+        );
+
+        if (rows.length === 0 || !rows[0].price) {
+            return res.status(404).json({ error: "Product not found or base price not set" });
+        }
+
+        const basePrice = rows[0].price;
+
+        await pool.promise().query(
+            "UPDATE products SET price = ?, final_price = ? WHERE id = ? AND is_active = TRUE",
+            [basePrice, basePrice, productId]
+        );
+
+        res.json({ message: "Discount canceled", restoredPrice: basePrice });
+    } catch (err) {
+        console.error("Database error:", err);
+        res.status(500).json({ error: "Database error" });
+    }
+});
+
 // ----- PRODUCT ROUTES -----
 
 app.get("/api/products", (req, res) => {
@@ -58,7 +208,7 @@ app.get("/api/products/:id", (req, res) => {
 });
 
 app.get("/api/categories", (req, res) => {
-  pool.query("SELECT * FROM categories", (err, results) => {
+  pool.query("SELECT * FROM categories where is_active = TRUE", (err, results) => {
     if (err) return res.status(500).json({ error: "Database error" });
     res.json(results);
   });
@@ -816,9 +966,10 @@ app.delete('/api/delete-product/:productId', async (req, res) => {
 app.post('/api/add-product', async (req, res) => {
   const {
     name,
+
     description = null,
     category_id,
-    price,
+    price = null,
     stock = 0,
     popularity = 0,
     image_path = null,
@@ -828,12 +979,15 @@ app.post('/api/add-product', async (req, res) => {
     distributor_info = 'N/A'
   } = req.body;
 
-  if (!name || !category_id || !price) {
-    return res.status(400).json({ error: 'Name, category, and price are required' });
+  if (!name || !category_id) {
+    return res.status(400).json({ error: 'Name, category are required' });
   }
 
   try {
+
+    // Insert the product into the products table
     const [result] = await pool.promise().query(
+
       `INSERT INTO products
         (name, description, category_id, price, stock, popularity, image_path,
          model, serial_number, warranty_status, distributor_info)
@@ -1012,3 +1166,54 @@ app.post('/api/orders/:orderId/cancel', async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 });
+app.post('/api/add-category', async (req, res) => {
+  const { name } = req.body;
+
+  if (!name) {
+    return res.status(400).json({ error: 'Category name is required' });
+  }
+
+  try {
+    await pool.promise().query(
+      'INSERT INTO categories (name) VALUES (?)',
+      [name]
+    );
+
+    res.json({ message: 'Category added successfully.' });
+  } catch (err) {
+    console.error('Error adding category:', err);
+    if (err.code === 'ER_DUP_ENTRY') {
+      res.status(400).json({ error: 'Category name must be unique' });
+    } else {
+      res.status(500).json({ error: 'Failed to add category' });
+    }
+  }
+});
+
+app.delete('/api/delete-category/:categoryId', async (req, res) => {
+  const { categoryId } = req.params;
+
+  try {
+    // First, deactivate all products in that category
+    await pool.promise().query(
+      'UPDATE products SET is_active = 0 WHERE category_id = ?',
+      [categoryId]
+    );
+
+    // Then delete the category
+    const [result] = await pool.promise().query(
+      'UPDATE categories SET is_active = 0 WHERE id = ?',
+      [categoryId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Category not found' });
+    }
+
+    res.json({ message: 'Category deleted & all related products deactivated.' });
+  } catch (err) {
+    console.error('Error deleting category:', err);
+    res.status(500).json({ error: 'Failed to delete category' });
+  }
+});
+

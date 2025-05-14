@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Grid, Typography, Button, Card, CardMedia, CardContent, CardActions } from '@mui/material';
+import { Box, Grid, Typography, Button, Card, CardMedia, CardContent, CardActions } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
 import { SessionContext } from '../middleware/SessionManager';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+
 
 const Container = styled('div')(({ theme }) => ({
   padding: theme.spacing(4),
@@ -14,6 +16,11 @@ function Wishlist() {
   const { user } = useContext(SessionContext);
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
+  const BackContainer = styled(Box)(({ theme }) => ({
+  marginBottom: theme.spacing(2),
+}));
+
+  
 
   useEffect(() => {
     if (!user) return;
@@ -32,6 +39,15 @@ function Wishlist() {
 
   return (
     <Container>
+		<BackContainer>
+		<Button
+		  startIcon={<ArrowBackIcon />}
+		  onClick={() => navigate('/')}
+		  variant="outlined"
+		>
+		  Back to Products
+		</Button>
+	  </BackContainer>
       <Typography variant="h4" gutterBottom>Your Wishlist</Typography>
       {items.length === 0 ? (
         <Typography>No items in your wishlist yet.</Typography>

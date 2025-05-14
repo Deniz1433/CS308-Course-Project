@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { createTheme, ThemeProvider, styled } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import {
   Box,
   Typography,
@@ -28,6 +29,10 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState('');
+  const BackContainer = styled(Box)(({ theme }) => ({
+  marginBottom: theme.spacing(2),
+}));
+
 
   useEffect(() => {
     if (!user) {
@@ -106,6 +111,15 @@ export default function ProfilePage() {
 
   return (
     <MainContainer>
+		<BackContainer>
+		<Button
+		  startIcon={<ArrowBackIcon />}
+		  onClick={() => navigate('/')}
+		  variant="outlined"
+		>
+		  Back to Products
+		</Button>
+	  </BackContainer>	
       <Card sx={{ maxWidth: 600, margin: 'auto' }}>
         <CardContent>
           <Typography variant="h4" gutterBottom>

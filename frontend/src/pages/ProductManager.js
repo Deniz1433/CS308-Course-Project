@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Box,
   Card,
@@ -29,8 +30,15 @@ import {
   Select,
   FormControl,
   InputLabel,
-  Alert
+  Alert,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  CardHeader,
+  DialogTitle
 } from '@mui/material';
+import CategoryIcon from '@mui/icons-material/Category';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import DeleteIcon from '@mui/icons-material/Delete';
 import InventoryIcon from '@mui/icons-material/Inventory';
@@ -39,7 +47,7 @@ import AddCircleIcon from '@mui/icons-material/AddCircle';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
-
+import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import ReceiptIcon from '@mui/icons-material/Receipt';
 
 import { useDropzone } from 'react-dropzone';
@@ -61,6 +69,12 @@ const ProductManager = () => {
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [orderStatusUpdating, setOrderStatusUpdating] = useState({});
   const [expandedOrder, setExpandedOrder] = useState(null);
+
+  // Categories states
+  const [newCategory, setNewCategory] = useState('');
+  const [deletingCategory, setDeletingCategory] = useState({});
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState(null);
   
   const [uploadedImageName, setUploadedImageName] = useState('');
 	const { getRootProps, getInputProps } = useDropzone({
@@ -92,28 +106,35 @@ const ProductManager = () => {
 
   const [newProduct, setNewProduct] = useState({
     name: '',
+    model: '',
+    serial_number: '',
     description: '',
-    category: '',
+    category_id: '',
     price: '',
     stock: '',
     popularity: '',
+    warranty_status: '',
+    distributor_info: '',
     image_path: '',
   });
   
   const [categories, setCategories] = useState([]);
 
-	useEffect(() => {
-	  async function fetchCategories() {
-		try {
-		  const res = await fetch('/api/categories');
-		  const data = await res.json();
-		  setCategories(data);
-		} catch (error) {
-		  console.error("Failed to fetch categories", error);
-		}
-	  }
-	  fetchCategories();
-	}, []);
+  useEffect(() => {
+    // Fetch categories when the component mounts
+    fetchCategories();
+  }, []);
+  
+  // Define fetchCategories function outside the useEffect so it can be used in other places
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch('/api/categories');
+      const data = await res.json();
+      setCategories(data); // Updates the categories state
+    } catch (error) {
+      console.error("Failed to fetch categories", error);
+    }
+  };
 
 
   // Status options for orders
@@ -255,11 +276,22 @@ const ProductManager = () => {
   };
 
   const handleAddProduct = async () => {
+  const {
+    name,
+    model,
+    serial_number,
+    description,
+    category_id,
+    price,
+    stock,
+    warranty_status,
+    distributor_info,
+    image_path,
+    popularity
+  } = newProduct;
 
-  const { name, category_id, price } = newProduct;
-
-  if (!name || !category_id || !price) {
-    alert('Please enter product name, category, and price');
+  if (!name || !category_id) {
+    alert('Please enter product name, category');
     return;
   }
 
@@ -269,35 +301,43 @@ const ProductManager = () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...newProduct,
-        price: parseFloat(newProduct.price),
-        stock: newProduct.stock ? parseInt(newProduct.stock) : 0,
-        popularity: newProduct.popularity ? parseInt(newProduct.popularity) : 0,
+        price: parseFloat(price),
+        stock: stock ? parseInt(stock, 10) : 0,
+        popularity: popularity ? parseInt(popularity, 10) : 0,
       }),
     });
-
     const result = await response.json();
 
     if (response.ok) {
       const addedProduct = {
         id: result.productId,
-        ...newProduct,
-        price: parseFloat(newProduct.price),
-        stock: newProduct.stock ? parseInt(newProduct.stock) : 0,
-        popularity: newProduct.popularity ? parseInt(newProduct.popularity) : 0,
+        name,
+        model,
+        serial_number,
+        description,
+        category_id,
+        price: parseFloat(price),
+        stock: stock ? parseInt(stock, 10) : 0,
+        warranty_status,
+        distributor_info,
+        image_path,
+        popularity: popularity ? parseInt(popularity, 10) : 0,
       };
 
-      setProducts(prevProducts => [...prevProducts, addedProduct]);
+      setProducts(prev => [...prev, addedProduct]);
       setNewProduct({
         name: '',
+        model: '',
+        serial_number: '',
         description: '',
-        category_id: '',  // <-- ✅ reset category_id not category
+        category_id: '',
         price: '',
         stock: '',
-        popularity: '',
+        warranty_status: '',
+        distributor_info: '',
         image_path: '',
-
+        popularity: '',
       });
-
       alert('Product added successfully');
     } else {
       alert(result.error || 'Failed to add product');
@@ -307,7 +347,6 @@ const ProductManager = () => {
     alert('An error occurred while adding the product');
   }
 };
-
 
 
   const handleUpdateStock = async (productId, newStock) => {
@@ -376,6 +415,65 @@ const ProductManager = () => {
       default: return 'default';
     }
   };
+
+  const handleAddCategory = async () => {
+    if (!newCategory.trim()) {
+      alert('Category name is required');
+      return;
+    }
+    
+    try {
+      const response = await fetch('/api/add-category', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newCategory }),
+      });
+      
+      if (response.ok) {
+        fetchCategories(); // Refresh the categories list
+        setNewCategory(''); // Clear the input
+        alert('Category added successfully');
+      } else {
+        const result = await response.json();
+        alert(result.error || 'Failed to add category');
+      }
+    } catch (err) {
+      console.error('Error adding category:', err);
+      alert('An error occurred while adding the category');
+    }
+  };
+  
+  const handleDeleteCategory = async (categoryId) => {
+    setDeletingCategory(prev => ({ ...prev, [categoryId]: true }));
+    
+    try {
+      const response = await fetch(`/api/delete-category/${categoryId}`, {
+        method: 'DELETE',
+      });
+      
+      if (response.ok) {
+        setCategories(prevCategories => 
+          prevCategories.filter(category => category.id !== categoryId)
+        );
+        setShowDeleteConfirmation(false);
+        alert('Category deleted successfully and associated products deactivated');
+        fetchProducts(); // Refresh products list to show updated status
+      } else {
+        const result = await response.json();
+        alert(result.error || 'Failed to delete category');
+      }
+    } catch (err) {
+      console.error('Error deleting category:', err);
+      alert('An error occurred while deleting the category');
+    } finally {
+      setDeletingCategory(prev => ({ ...prev, [categoryId]: false }));
+    }
+  };
+  
+  const openDeleteConfirmation = (category) => {
+    setCategoryToDelete(category);
+    setShowDeleteConfirmation(true);
+  };
   
   const calculateOrderTotal = (items) => {
     return items.reduce((total, item) => total + (item.price_at_time * item.quantity), 0);
@@ -392,172 +490,265 @@ const ProductManager = () => {
 
     return (
       <>
+        {/* Category Management Section */}
+        <Card elevation={2} sx={{ mb: 4, borderRadius: 2 }}>
+          <CardContent>
+            <Typography variant="h6" fontWeight="medium" sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
+              <CategoryIcon sx={{ mr: 1, color: 'primary.main' }} /> Category Management
+            </Typography>
+            
+            <Grid container spacing={3}>
+              {/* Existing Categories */}
+              <Grid item xs={12} md={7}>
+                <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 1, mb: { xs: 2, md: 0 } }}>
+                  <Table size="small">
+                    <TableHead sx={{ bgcolor: 'grey.50' }}>
+                      <TableRow>
+                        <TableCell width="15%">ID</TableCell>
+                        <TableCell>Name</TableCell>
+                        <TableCell align="right">Action</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {categories.map((category) => (
+                        <TableRow key={category.id} hover>
+                          <TableCell>{category.id}</TableCell>
+                          <TableCell>{category.name}</TableCell>
+                          <TableCell align="right">
+                            <IconButton
+                              color="error"
+                              size="small"
+                              onClick={() => openDeleteConfirmation(category)}
+                              disabled={deletingCategory[category.id]}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Grid>
+              
+              {/* Add New Category */}
+              <Grid item xs={12} md={5}>
+                <Paper sx={{ p: 2, borderRadius: 1, bgcolor: 'grey.50' }}>
+                  <Typography variant="subtitle1" fontWeight="medium" gutterBottom>
+                    Add New Category
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <TextField
+                      fullWidth
+                      label="Category Name"
+                      value={newCategory}
+                      onChange={(e) => setNewCategory(e.target.value)}
+                      placeholder="Enter category name"
+                      size="small"
+                      variant="outlined"
+                    />
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      startIcon={<AddCircleIcon />}
+                      onClick={handleAddCategory}
+                      sx={{ whiteSpace: 'nowrap' }}
+                    >
+                      Add
+                    </Button>
+                  </Box>
+                </Paper>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
+
         {/* Add Product Form */}
-		<Card elevation={3} sx={{ mb: 5, overflow: 'visible' }}>
-		  <CardContent>
-			<Typography variant="h6" fontWeight="medium" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-			  <AddCircleIcon sx={{ mr: 1 }} /> Add New Product
-			</Typography>
-			<Divider sx={{ my: 2 }} />
-			
-			<Grid container spacing={2}>
-			  {/* Name - Required */}
-			  <Grid item xs={12} sm={6} md={4}>
-				<TextField
-				  fullWidth
-				  required
-				  label="Name"
-				  value={newProduct.name}
-				  onChange={(e) => handleInputChange('name', e.target.value)}
-				/>
-			  </Grid>
+        <Card elevation={2} sx={{ mb: 5, borderRadius: 2 }}>
+          <CardHeader
+            title={
+              <Typography variant="h6" fontWeight="medium" sx={{ display: 'flex', alignItems: 'center' }}>
+                <AddCircleIcon sx={{ mr: 1, color: 'primary.main' }} /> Add New Product
+              </Typography>
+            }
+            sx={{ pb: 0 }}
+          />
+          
+          <CardContent>
+            <Box sx={{ mt: 1, mb: 3 }}>
+              {/* Image Upload Section */}
+              <Paper 
+                {...getRootProps()} 
+                elevation={0} 
+                sx={{ 
+                  border: '2px dashed', 
+                  borderColor: 'primary.light', 
+                  borderRadius: 2, 
+                  p: 3, 
+                  textAlign: 'center', 
+                  cursor: 'pointer',
+                  bgcolor: 'action.hover',
+                  mb: 3
+                }}
+              >
+                <input {...getInputProps()} />
+                <Box sx={{ mb: 1 }}>
+                  <AddPhotoAlternateIcon sx={{ fontSize: 40, color: 'text.secondary' }} />
+                </Box>
+                <Typography variant="body1" color="text.secondary">
+                  {uploadedImageName || "Drag & drop product image here, or click to select"}
+                </Typography>
+              </Paper>
 
-			  {/* Model - Optional */}
-			  <Grid item xs={12} sm={6} md={4}>
-				<TextField
-				  fullWidth
-				  label="Model"
-				  value={newProduct.model}
-				  onChange={(e) => handleInputChange('model', e.target.value)}
-				/>
-			  </Grid>
-
-			  {/* Serial Number - Optional but Unique */}
-			  <Grid item xs={12} sm={6} md={4}>
-				<TextField
-				  fullWidth
-				  label="Serial Number"
-				  value={newProduct.serial_number}
-				  onChange={(e) => handleInputChange('serial_number', e.target.value)}
-				/>
-			  </Grid>
-
-			  <Grid item xs={12} sm={6} md={4}>
-				  <TextField
-					fullWidth
-					required
-					select
-					label="Category"
-					value={newProduct.category_id}
-					onChange={(e) => handleInputChange('category_id', e.target.value)}
-				  >
-					{categories.map((cat) => (
-					  <MenuItem key={cat.id} value={cat.id}>
-						{cat.name}
-					  </MenuItem>
-					))}
-				  </TextField>
-				</Grid>
-
-			  {/* Price - Required */}
-			  <Grid item xs={12} sm={6} md={4}>
-				<TextField
-				  fullWidth
-				  required
-				  label="Price ($)"
-				  type="number"
-				  value={newProduct.price}
-				  onChange={(e) => handleInputChange('price', e.target.value)}
-				  InputProps={{
-					inputProps: { min: 0, step: 0.01 }
-				  }}
-				/>
-			  </Grid>
-
-			  {/* Stock - Optional (default 0) */}
-			  <Grid item xs={12} sm={6} md={4}>
-				<TextField
-				  fullWidth
-				  label="Initial Stock"
-				  type="number"
-				  value={newProduct.stock}
-				  onChange={(e) => handleInputChange('stock', e.target.value)}
-				  InputProps={{
-					inputProps: { min: 0 }
-				  }}
-				/>
-			  </Grid>
-
-			  {/* Warranty Status - Optional (default 'No Warranty') */}
-			  <Grid item xs={12} sm={6} md={4}>
-				<TextField
-				  fullWidth
-				  label="Warranty Status"
-				  value={newProduct.warranty_status}
-				  onChange={(e) => handleInputChange('warranty_status', e.target.value)}
-				  placeholder="No Warranty"
-				/>
-			  </Grid>
-
-			  {/* Distributor Info - Optional */}
-			  <Grid item xs={12} sm={6} md={4}>
-				<TextField
-				  fullWidth
-				  label="Distributor Info"
-				  value={newProduct.distributor_info}
-				  onChange={(e) => handleInputChange('distributor_info', e.target.value)}
-				/>
-			  </Grid>
-
-			  <Grid item xs={12} sm={6} md={4}>
-			  <Box
-				{...getRootProps()}
-				sx={{
-				  border: '2px dashed #ccc',
-				  borderRadius: 2,
-				  p: 3,
-				  textAlign: 'center',
-				  cursor: 'pointer'
-				}}
-			  >
-				<input {...getInputProps()} />
-				<Typography variant="body1">
-				  {uploadedImageName || "Drag & drop an image here, or click to select"}
-				</Typography>
-			  </Box>
-			</Grid>
-
-			  
-			  {/* Popularity - Optional (default 0) */}
-			  <Grid item xs={12} sm={6} md={4}>
-				<TextField
-				  fullWidth
-				  label="Popularity (1-10)"
-				  type="number"
-				  value={newProduct.popularity}
-				  onChange={(e) => handleInputChange('popularity', e.target.value)}
-				  InputProps={{
-					inputProps: { min: 0, max: 10 }
-				  }}
-				/>
-			  </Grid>
-
-			  {/* Description - Optional */}
-			  <Grid item xs={12}>
-				<TextField
-				  fullWidth
-				  multiline
-				  rows={3}
-				  label="Description"
-				  value={newProduct.description}
-				  onChange={(e) => handleInputChange('description', e.target.value)}
-				/>
-			  </Grid>
-			</Grid>
-
-			<Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
-			  <Button 
-				variant="contained" 
-				size="large"
-				color="primary" 
-				startIcon={<AddCircleIcon />}
-				onClick={handleAddProduct}
-			  >
-				Add Product
-			  </Button>
-			</Box>
-		  </CardContent>
-		</Card>
+              <Grid container spacing={2}>
+                {/* Left Column - Basic Info */}
+                <Grid item xs={12} md={6}>
+                  <Typography variant="subtitle1" fontWeight="medium" gutterBottom sx={{ mb: 2 }}>
+                    Basic Information
+                  </Typography>
+                  
+                  <Grid container spacing={2}>
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        required
+                        label="Product Name"
+                        value={newProduct.name}
+                        onChange={(e) => handleInputChange('name', e.target.value)}
+                      />
+                    </Grid>
+                    
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Model"
+                        value={newProduct.model}
+                        onChange={(e) => handleInputChange('model', e.target.value)}
+                      />
+                    </Grid>
+                    
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Serial Number"
+                        value={newProduct.serial_number}
+                        onChange={(e) => handleInputChange('serial_number', e.target.value)}
+                      />
+                    </Grid>
+                    
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        multiline
+                        rows={3}
+                        label="Description"
+                        value={newProduct.description}
+                        onChange={(e) => handleInputChange('description', e.target.value)}
+                      />
+                    </Grid>
+                  </Grid>
+                </Grid>
+                
+                {/* Right Column - Details and Inventory */}
+                <Grid item xs={12} md={6}>
+                  <Typography variant="subtitle1" fontWeight="medium" gutterBottom sx={{ mb: 2 }}>
+                    Pricing & Inventory
+                  </Typography>
+                  
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        required
+                        select
+                        label="Category"
+                        value={newProduct.category_id}
+                        onChange={(e) => handleInputChange('category_id', e.target.value)}
+                      >
+                        {categories.map((cat) => (
+                          <MenuItem key={cat.id} value={cat.id}>
+                            {cat.name}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Grid>
+                    
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth                        
+                        label="Price ($)"
+                        type="number"
+                        value={newProduct.price}
+                        onChange={(e) => handleInputChange('price', e.target.value)}
+                        InputProps={{
+                          inputProps: { min: 0, step: 0.01 }
+                        }}
+                      />
+                    </Grid>
+                    
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Initial Stock"
+                        type="number"
+                        value={newProduct.stock}
+                        onChange={(e) => handleInputChange('stock', e.target.value)}
+                        InputProps={{
+                          inputProps: { min: 0 }
+                        }}
+                      />
+                    </Grid>
+                    
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Popularity (1-10)"
+                        type="number"
+                        value={newProduct.popularity}
+                        onChange={(e) => handleInputChange('popularity', e.target.value)}
+                        InputProps={{
+                          inputProps: { min: 0, max: 10 }
+                        }}
+                      />
+                    </Grid>
+                    
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Warranty Status"
+                        value={newProduct.warranty_status}
+                        onChange={(e) => handleInputChange('warranty_status', e.target.value)}
+                        placeholder="No Warranty"
+                      />
+                    </Grid>
+                    
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Distributor Info"
+                        value={newProduct.distributor_info}
+                        onChange={(e) => handleInputChange('distributor_info', e.target.value)}
+                      />
+                    </Grid>
+                  </Grid>
+                </Grid>
+              </Grid>
+            </Box>
+            
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Button 
+                variant="contained" 
+                size="large"
+                color="primary" 
+                startIcon={<AddCircleIcon />}
+                onClick={handleAddProduct}
+                sx={{ px: 4 }}
+              >
+                Add Product
+              </Button>
+            </Box>
+          </CardContent>
+        </Card>
 
 
         {/* Products List */}
@@ -819,13 +1010,10 @@ const ProductManager = () => {
                             
                             {/* Add the View Invoice button here */}
                             <Button
+                              component={Link}
+                              to={`/invoice/${order.order_id}`} // Link to the InvoicePage with orderId
                               variant="contained"
-                              href={`http://localhost:5000/api/invoice/${order.order_id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              sx={{ mt: 2 }}
-                              size="small"
-                              startIcon={<ReceiptIcon />}
+                              color="primary"
                             >
                               View Invoice
                             </Button>
@@ -949,8 +1137,30 @@ const ProductManager = () => {
 
       {activeTab === 0 && renderProductsTab()}
       {activeTab === 1 && renderOrdersTab()}
+      {/* Delete Category Confirmation Dialog */}
+      <Dialog
+        open={showDeleteConfirmation}
+        onClose={() => setShowDeleteConfirmation(false)}
+      >
+        <DialogTitle>Delete Category</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete the category "{categoryToDelete?.name}"? 
+            All products in this category will be deleted.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowDeleteConfirmation(false)}>Cancel</Button>
+          <Button 
+            onClick={() => handleDeleteCategory(categoryToDelete?.id)} 
+            color="error" 
+            variant="contained"
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };
-
 export default ProductManager;
