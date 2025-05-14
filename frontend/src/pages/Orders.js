@@ -1,4 +1,3 @@
-// frontend/src/pages/Orders.js
 import React, { useEffect, useState, useContext } from 'react';
 import { SessionContext } from '../middleware/SessionManager';
 import { useNavigate } from 'react-router-dom';
@@ -11,7 +10,8 @@ import {
   Paper,
   Box,
   Divider,
-  CircularProgress
+  CircularProgress,
+  Stack
 } from '@mui/material';
 
 const Orders = () => {
@@ -52,6 +52,31 @@ const Orders = () => {
     fetchOrders();
   }, [user, navigate]);
 
+  const cancelOrder = async (orderId) => {
+    if (!window.confirm('Are you sure you want to cancel this order?')) return;
+
+    try {
+      const response = await fetch(`/api/orders/${orderId}/cancel`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error(`Cancel failed: ${response.status}`);
+      }
+
+      // Refresh orders after cancel
+      setOrders((prev) =>
+        prev.map(order =>
+          order.order_id === orderId ? { ...order, status: 'cancelled' } : order
+        )
+      );
+    } catch (error) {
+      console.error('Error cancelling order:', error);
+      alert('Failed to cancel the order.');
+    }
+  };
+
   if (loading) {
     return (
       <Container sx={{ mt: 6 }}>
@@ -78,7 +103,18 @@ const Orders = () => {
       ) : (
         orders.map((order) => (
           <Paper key={order.order_id} sx={{ p: 3, mb: 3 }}>
-            <Typography variant="h6">Order #{order.order_id}</Typography>
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Typography variant="h6">Order #{order.order_id}</Typography>
+              {order.status === 'processing' && (
+                <Button
+                  variant="outlined"
+                  color="error"
+                  onClick={() => cancelOrder(order.order_id)}
+                >
+                  Cancel
+                </Button>
+              )}
+            </Stack>
             <Typography>Status: {order.status}</Typography>
             <Typography>Date: {new Date(order.order_date).toLocaleString()}</Typography>
             <Divider sx={{ my: 2 }} />

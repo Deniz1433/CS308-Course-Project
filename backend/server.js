@@ -1128,6 +1128,44 @@ app.delete("/api/delete-comment-pm/:commentId", async (req, res) => {
   }
 });
 
+// POST /api/orders/:orderId/cancel
+app.post('/api/orders/:orderId/cancel', async (req, res) => {
+  const orderId = parseInt(req.params.orderId, 10);
+  const userId = req.session.user?.id;
+
+  if (!userId) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+
+  try {
+    // Check if the order exists, belongs to the user, and is processing
+    const [rows] = await pool.promise().query(
+      'SELECT status FROM orders WHERE id = ? AND user_id = ?',
+      [orderId, userId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Order not found or not authorized' });
+    }
+
+    const { status } = rows[0];
+
+    if (status !== 'processing') {
+      return res.status(400).json({ message: 'Only orders in processing state can be cancelled' });
+    }
+
+    // Update the order status
+    await pool.promise().query(
+      'UPDATE orders SET status = ? WHERE id = ?',
+      ['cancelled', orderId]
+    );
+
+    res.json({ message: 'Order cancelled successfully' });
+  } catch (err) {
+    console.error('Error cancelling order:', err);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
 app.post('/api/add-category', async (req, res) => {
   const { name } = req.body;
 
