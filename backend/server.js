@@ -1137,35 +1137,63 @@ app.post('/api/orders/:orderId/cancel', async (req, res) => {
     return res.status(401).json({ message: 'Unauthorized' });
   }
 
+  const conn = await pool.promise().getConnection();
   try {
-    // Check if the order exists, belongs to the user, and is processing
-    const [rows] = await pool.promise().query(
+    // Start transaction
+    await conn.beginTransaction();
+
+    // Check ownership and current status
+    const [orders] = await conn.query(
       'SELECT status FROM orders WHERE id = ? AND user_id = ?',
       [orderId, userId]
     );
 
-    if (rows.length === 0) {
+    if (orders.length === 0) {
+      await conn.rollback();
       return res.status(404).json({ message: 'Order not found or not authorized' });
     }
 
-    const { status } = rows[0];
+    const { status } = orders[0];
 
     if (status !== 'processing') {
+      await conn.rollback();
       return res.status(400).json({ message: 'Only orders in processing state can be cancelled' });
     }
 
-    // Update the order status
-    await pool.promise().query(
+    // Fetch ordered items
+    const [items] = await conn.query(
+      'SELECT product_id, quantity FROM order_items WHERE order_id = ?',
+      [orderId]
+    );
+
+    // Restore product stock
+    for (const item of items) {
+      await conn.query(
+        'UPDATE products SET stock = stock + ? WHERE id = ?',
+        [item.quantity, item.product_id]
+      );
+    }
+
+    // Set order status to cancelled
+    await conn.query(
       'UPDATE orders SET status = ? WHERE id = ?',
       ['cancelled', orderId]
     );
 
-    res.json({ message: 'Order cancelled successfully' });
+    await conn.commit();
+    res.json({ message: 'Order cancelled and stock restored successfully' });
   } catch (err) {
+    await conn.rollback();
     console.error('Error cancelling order:', err);
     res.status(500).json({ message: 'Internal server error' });
+  } finally {
+    conn.release();
   }
 });
+
+
+
+
 app.post('/api/add-category', async (req, res) => {
   const { name } = req.body;
 
