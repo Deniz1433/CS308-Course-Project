@@ -530,13 +530,16 @@ app.get("/api/orders", async (req, res) => {
     for (let order of orders) {
       const [items] = await pool.promise().query(
         `SELECT
-           oi.product_id,
-           p.name,
-           oi.quantity,
-           oi.price_at_time
-         FROM order_items oi
-         JOIN products p ON p.id = oi.product_id
-         WHERE oi.order_id = ?`,
+          oi.product_id,
+          p.name,
+          oi.quantity,
+          oi.price_at_time,
+          (SELECT status FROM refund_requests rr
+            WHERE rr.order_id = oi.order_id AND rr.product_id = oi.product_id
+            LIMIT 1) AS refund_status
+        FROM order_items oi
+        JOIN products p ON p.id = oi.product_id
+        WHERE oi.order_id = ?`,
         [order.order_id]
       );
       order.items = items;
@@ -1191,7 +1194,101 @@ app.post('/api/orders/:orderId/cancel', async (req, res) => {
   }
 });
 
+app.post('/api/refund-request', async (req, res) => {
+  const userId = req.session.user?.id;
+  const { orderId, productId } = req.body;
 
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+  try {
+    // Verify the order and delivery status
+    const [[order]] = await pool.promise().query(
+      `SELECT status, order_date FROM orders WHERE id = ? AND user_id = ?`,
+      [orderId, userId]
+    );
+    if (!order || order.status !== 'delivered') {
+      return res.status(400).json({ error: "Refunds allowed only for delivered orders" });
+    }
+
+    const daysPassed = (Date.now() - new Date(order.order_date).getTime()) / (1000 * 60 * 60 * 24);
+    if (daysPassed > 30) {
+      return res.status(400).json({ error: "Refund request expired (30 days max)" });
+    }
+
+    await pool.promise().query(
+      `INSERT INTO refund_requests (user_id, order_id, product_id)
+       VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE status = 'pending'`,
+      [userId, orderId, productId]
+    );
+
+    res.json({ message: "Refund request submitted." });
+  } catch (err) {
+    console.error("Refund request error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+
+// Fetch all pending refund requests
+app.get('/api/refund-requests', async (req, res) => {
+  try {
+    const [rows] = await pool.promise().query(`
+      SELECT rr.id, rr.user_id, rr.order_id, rr.product_id, rr.status, rr.request_date,
+             p.name AS product_name, u.name AS customer_name
+      FROM refund_requests rr
+      JOIN products p ON p.id = rr.product_id
+      JOIN users u ON u.id = rr.user_id
+      WHERE rr.status = 'pending'
+      ORDER BY rr.request_date DESC
+    `);
+    res.json(rows);
+  } catch (err) {
+    console.error("Error fetching refund requests:", err);
+    res.status(500).json({ error: "Failed to fetch refund requests" });
+  }
+});
+
+// Approve refund request and update stock for the sales manager
+app.put('/api/refund-requests/:id/approve', async (req, res) => {
+  const refundId = req.params.id;
+
+  try {
+    const conn = await pool.promise().getConnection();
+    await conn.beginTransaction();
+
+    // Get refund request details with quantity from order_items
+    const [[refund]] = await conn.query(
+      `SELECT rr.*, oi.quantity
+       FROM refund_requests rr
+       JOIN order_items oi ON oi.order_id = rr.order_id AND oi.product_id = rr.product_id
+       WHERE rr.id = ? AND rr.status = 'pending'`,
+      [refundId]
+    );
+
+    if (!refund) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Refund request not found or already handled' });
+    }
+
+    // Increase stock by the purchased quantity
+    await conn.query(
+      'UPDATE products SET stock = stock + ? WHERE id = ?',
+      [refund.quantity, refund.product_id]
+    );
+
+    // Mark refund as approved
+    await conn.query(
+      'UPDATE refund_requests SET status = "approved" WHERE id = ?',
+      [refundId]
+    );
+
+    await conn.commit();
+    res.json({ message: `Refund approved. Restored ${refund.quantity} unit(s) to stock.` });
+  } catch (err) {
+    console.error("Approve refund error:", err);
+    res.status(500).json({ error: 'Failed to approve refund' });
+  }
+});
 
 
 app.post('/api/add-category', async (req, res) => {

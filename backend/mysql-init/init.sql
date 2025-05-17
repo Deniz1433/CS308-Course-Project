@@ -137,6 +137,20 @@ CREATE TABLE IF NOT EXISTS wishlists (
   FOREIGN KEY (product_id) REFERENCES products(id)
 ) ENGINE=InnoDB;
 
+
+CREATE TABLE IF NOT EXISTS refund_requests (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  order_id INT NOT NULL,
+  product_id INT NOT NULL,
+  request_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+  UNIQUE KEY unique_refund (user_id, order_id, product_id)
+) ENGINE=InnoDB;
+
 ALTER TABLE products MODIFY price DECIMAL(10,2) DEFAULT NULL;
 ALTER TABLE products ADD final_price DECIMAL(10,2) DEFAULT NULL;
 ALTER TABLE products ADD discount_rate DECIMAL(5, 2) DEFAULT 0;

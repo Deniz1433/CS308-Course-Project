@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     Box, Typography, TextField, Button, Accordion,
-    AccordionSummary, AccordionDetails, CircularProgress
+    AccordionSummary, AccordionDetails, CircularProgress, Paper
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useNavigate } from 'react-router-dom';
@@ -14,10 +14,43 @@ const SalesManager = () => {
     const [discountRates, setDiscountRates] = useState({});
     const [updating, setUpdating] = useState({});
     const navigate = useNavigate();
+    const [refunds, setRefunds] = useState([]);
+    const [loadingRefunds, setLoadingRefunds] = useState(true);
+
 
     useEffect(() => {
         fetchUnpricedProducts();
+        fetchRefundRequests();
     }, []);
+    
+    const fetchRefundRequests = async () => {
+        try {
+          const res = await fetch('/api/refund-requests');
+          const data = await res.json();
+          setRefunds(data);
+        } catch (err) {
+          console.error("Failed to load refunds", err);
+        } finally {
+          setLoadingRefunds(false);
+        }
+      };
+
+
+      const approveRefund = async (id) => {
+        if (!window.confirm("Approve this refund request?")) return;
+        try {
+          const res = await fetch(`/api/refund-requests/${id}/approve`, {
+            method: 'PUT'
+          });
+          const data = await res.json();
+          alert(data.message);
+          setRefunds(prev => prev.filter(r => r.id !== id)); // remove from list
+        } catch (err) {
+          console.error("Approval failed", err);
+          alert("Approval failed");
+        }
+      };
+      
 
     const fetchUnpricedProducts = async () => {
         setLoading(true);
@@ -80,7 +113,7 @@ const SalesManager = () => {
     const handleApplyDiscount = async (productId) => {
         const rate = parseFloat(discountRates[productId]);
         if (isNaN(rate) || rate < 0 || rate > 100) {
-            alert('Please enter a valid discount rate (0–100)');
+            alert('Please enter a valid discount rate (0ï¿½100)');
             return;
         }
 
@@ -168,107 +201,135 @@ const SalesManager = () => {
 
     return (
         <Box p={3}>
-            <Button
-                variant="contained"
-                color="primary"
-                onClick={() => navigate('/unpriced-products')}
-                style={{ marginBottom: '10px' }}
-            >
-                View Unpriced Products
-            </Button>
-
-            <Typography variant="h4" gutterBottom>
-                Products 
-            </Typography>
-
-            {products.length === 0 ? (
-                <Typography>No products </Typography>
-            ) : (
-                products.map(product => (
-                    <Accordion
-                        key={product.id}
-                        expanded={expandedProduct === product.id}
-                        onChange={handleAccordionChange(product.id)}
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => navigate('/unpriced-products')}
+            style={{ marginBottom: '10px' }}
+          >
+            View Unpriced Products
+          </Button>
+    
+          <Typography variant="h4" gutterBottom>
+            Products
+          </Typography>
+    
+          {loading ? (
+            <Box display="flex" justifyContent="center" alignItems="center" minHeight="40vh">
+              <CircularProgress />
+            </Box>
+          ) : products.length === 0 ? (
+            <Typography>No products available</Typography>
+          ) : (
+            products.map(product => (
+              <Accordion
+                key={product.id}
+                expanded={expandedProduct === product.id}
+                onChange={handleAccordionChange(product.id)}
+              >
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Typography>{product.name}</Typography>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Typography>Description: {product.description}</Typography>
+                  {product.price && (
+                    <Typography sx={{ mt: 1 }}>
+                      Original Price: <strong>${product.price}</strong>
+                    </Typography>
+                  )}
+                  {product.final_price && (
+                    <Typography sx={{ mt: 1 }}>
+                      Final Price: <strong>${product.final_price}</strong>
+                    </Typography>
+                  )}
+    
+                  <Box mt={2}>
+                    <TextField
+                      label="Set Price"
+                      type="number"
+                      fullWidth
+                      value={priceUpdates[product.id] || ''}
+                      onChange={(e) => handlePriceChange(product.id, e.target.value)}
+                    />
+                  </Box>
+    
+                  <Box mt={2}>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      disabled={updating[product.id]}
+                      onClick={() => handleSetPrice(product.id)}
                     >
-                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                            <Typography>{product.name}</Typography>
-                        </AccordionSummary>
-                        <AccordionDetails>
-                            <Typography>Description: {product.description}</Typography>
-                            {product.price && (
-                                <Typography sx={{ mt: 1 }}>
-                                    Original Price: <strong>${product.price}</strong>
-                                </Typography>
-                            )}
-                            {product.final_price && (
-                                <Typography sx={{ mt: 1 }}>
-                                    Final Price: <strong>${product.final_price}</strong>
-                                </Typography>
-                            )}
-
-                            {/* Price Field */}
-                            <Box mt={2}>
-                                <TextField
-                                    label="Set Price"
-                                    type="number"
-                                    fullWidth
-                                    value={priceUpdates[product.id] || ''}
-                                    onChange={(e) => handlePriceChange(product.id, e.target.value)}
-                                />
-                            </Box>
-
-                            <Box mt={2}>
-                                <Button
-                                    variant="contained"
-                                    color="primary"
-                                    disabled={updating[product.id]}
-                                    onClick={() => handleSetPrice(product.id)}
-                                >
-                                    {updating[product.id] ? 'Updating...' : 'Set Price'}
-                                </Button>
-                            </Box>
-
-                            {/* Discount Field */}
-                            <Box mt={4}>
-                                <TextField
-                                    label="Discount Rate (%)"
-                                    type="number"
-                                    fullWidth
-                                    value={discountRates[product.id] || ''}
-                                    onChange={(e) => handleDiscountChange(product.id, e.target.value)}
-                                />
-                            </Box>
-
-                            <Box mt={2}>
-                                <Button
-                                    variant="contained"
-                                    color="secondary"
-                                    disabled={updating[product.id]}
-                                    onClick={() => handleApplyDiscount(product.id)}
-                                >
-                                    {updating[product.id] ? 'Applying...' : 'Apply Discount'}
-                                </Button>
-                            </Box>
-
-                            <Box mt={1}>
-                                <Button
-                                    variant="outlined"
-                                    color="error"
-                                    disabled={updating[product.id]}
-                                    onClick={() => handleCancelDiscount(product.id)}
-                                >
-                                    {updating[product.id] ? 'Cancelling...' : 'Cancel Discount'}
-                                </Button>
-                            </Box>
-
-                        </AccordionDetails>
-                    </Accordion>
-                ))
-            )}
+                      {updating[product.id] ? 'Updating...' : 'Set Price'}
+                    </Button>
+                  </Box>
+    
+                  <Box mt={4}>
+                    <TextField
+                      label="Discount Rate (%)"
+                      type="number"
+                      fullWidth
+                      value={discountRates[product.id] || ''}
+                      onChange={(e) => handleDiscountChange(product.id, e.target.value)}
+                    />
+                  </Box>
+    
+                  <Box mt={2}>
+                    <Button
+                      variant="contained"
+                      color="secondary"
+                      disabled={updating[product.id]}
+                      onClick={() => handleApplyDiscount(product.id)}
+                    >
+                      {updating[product.id] ? 'Applying...' : 'Apply Discount'}
+                    </Button>
+                  </Box>
+    
+                  <Box mt={1}>
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      disabled={updating[product.id]}
+                      onClick={() => handleCancelDiscount(product.id)}
+                    >
+                      {updating[product.id] ? 'Cancelling...' : 'Cancel Discount'}
+                    </Button>
+                  </Box>
+                </AccordionDetails>
+              </Accordion>
+            ))
+          )}
+    
+          <Typography variant="h4" gutterBottom sx={{ mt: 6 }}>
+            Pending Refund Requests
+          </Typography>
+    
+          {loadingRefunds ? (
+            <CircularProgress />
+          ) : refunds.length === 0 ? (
+            <Typography>No pending refund requests</Typography>
+          ) : (
+            refunds.map(refund => (
+              <Paper key={refund.id} sx={{ p: 2, mb: 2 }}>
+                <Typography><strong>Customer:</strong> {refund.customer_name}</Typography>
+                <Typography><strong>Product:</strong> {refund.product_name}</Typography>
+                <Typography><strong>Order ID:</strong> {refund.order_id}</Typography>
+                <Typography><strong>Quantity:</strong> {refund.quantity}</Typography>
+                <Typography><strong>Requested on:</strong> {new Date(refund.request_date).toLocaleString()}</Typography>
+                <Button
+                  variant="contained"
+                  color="success"
+                  sx={{ mt: 1 }}
+                  onClick={() => approveRefund(refund.id)}
+                >
+                  Approve Refund
+                </Button>
+              </Paper>
+            ))
+          )}
         </Box>
-    );
-};
-
+      );
+    };
 export default SalesManager;
 
 
