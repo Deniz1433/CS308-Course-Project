@@ -38,3 +38,10 @@ docker-compose.override.yml
 *.tgz
 
 invoices/
+
+# Terraform
+terraform.tfvars
+.terraform/
+terraform.tfstate
+terraform.tfstate.backup
+*.tfplan

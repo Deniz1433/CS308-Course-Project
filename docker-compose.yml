@@ -17,6 +17,7 @@ services:
 
   backend:
     build: ./backend
+    image: europe-west1-docker.pkg.dev/zinc-mantra-460321-t3/repo/backend:latest
     container_name: backend_container
     restart: always
     ports:
@@ -56,6 +57,7 @@ services:
 
   frontend:
     build: ./frontend
+    image: europe-west1-docker.pkg.dev/zinc-mantra-460321-t3/repo/frontend:latest
     container_name: frontend_container
     restart: always
     ports:

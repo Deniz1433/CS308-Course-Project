@@ -1,0 +1,616 @@
+
+Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
+  + create
+
+Terraform will perform the following actions:
+
+  # google_compute_firewall.allow_mysql_internal will be created
+  + resource "google_compute_firewall" "allow_mysql_internal" {
+      + creation_timestamp = (known after apply)
+      + destination_ranges = (known after apply)
+      + direction          = "INGRESS"
+      + enable_logging     = (known after apply)
+      + id                 = (known after apply)
+      + name               = "allow-mysql-internal"
+      + network            = "default"
+      + priority           = 1000
+      + project            = (known after apply)
+      + self_link          = (known after apply)
+      + source_ranges      = [
+          + "10.0.0.0/8",
+        ]
+      + target_tags        = [
+          + "mysql-server",
+        ]
+
+      + allow {
+          + ports    = [
+              + "3306",
+            ]
+          + protocol = "tcp"
+        }
+    }
+
+  # google_compute_instance.mysql_vm will be created
+  + resource "google_compute_instance" "mysql_vm" {
+      + can_ip_forward          = false
+      + cpu_platform            = (known after apply)
+      + current_status          = (known after apply)
+      + deletion_protection     = false
+      + guest_accelerator       = (known after apply)
+      + id                      = (known after apply)
+      + instance_id             = (known after apply)
+      + label_fingerprint       = (known after apply)
+      + machine_type            = "e2-micro"
+      + metadata_fingerprint    = (known after apply)
+      + metadata_startup_script = (sensitive value)
+      + min_cpu_platform        = (known after apply)
+      + name                    = "mysql-vm"
+      + project                 = (known after apply)
+      + self_link               = (known after apply)
+      + tags                    = [
+          + "mysql-server",
+        ]
+      + tags_fingerprint        = (known after apply)
+      + zone                    = "europe-west1-b"
+
+      + boot_disk {
+          + auto_delete                = true
+          + device_name                = (known after apply)
+          + disk_encryption_key_sha256 = (known after apply)
+          + kms_key_self_link          = (known after apply)
+          + mode                       = "READ_WRITE"
+          + source                     = (known after apply)
+
+          + initialize_params {
+              + image  = "debian-cloud/debian-11"
+              + labels = (known after apply)
+              + size   = 20
+              + type   = (known after apply)
+            }
+        }
+
+      + confidential_instance_config (known after apply)
+
+      + network_interface {
+          + internal_ipv6_prefix_length = (known after apply)
+          + ipv6_access_type            = (known after apply)
+          + ipv6_address                = (known after apply)
+          + name                        = (known after apply)
+          + network                     = "default"
+          + network_ip                  = (known after apply)
+          + stack_type                  = (known after apply)
+          + subnetwork                  = (known after apply)
+          + subnetwork_project          = (known after apply)
+
+          + access_config {
+              + nat_ip       = (known after apply)
+              + network_tier = (known after apply)
+            }
+        }
+
+      + reservation_affinity (known after apply)
+
+      + scheduling (known after apply)
+    }
+
+  # google_container_cluster.gke_cluster will be created
+  + resource "google_container_cluster" "gke_cluster" {
+      + cluster_ipv4_cidr           = (known after apply)
+      + datapath_provider           = (known after apply)
+      + default_max_pods_per_node   = (known after apply)
+      + enable_binary_authorization = false
+      + enable_intranode_visibility = (known after apply)
+      + enable_kubernetes_alpha     = false
+      + enable_l4_ilb_subsetting    = false
+      + enable_legacy_abac          = false
+      + enable_shielded_nodes       = true
+      + endpoint                    = (known after apply)
+      + id                          = (known after apply)
+      + initial_node_count          = 1
+      + label_fingerprint           = (known after apply)
+      + location                    = "europe-west1-b"
+      + logging_service             = (known after apply)
+      + master_version              = (known after apply)
+      + monitoring_service          = (known after apply)
+      + name                        = "ecommerce-cluster"
+      + network                     = "default"
+      + networking_mode             = "VPC_NATIVE"
+      + node_locations              = (known after apply)
+      + node_version                = (known after apply)
+      + operation                   = (known after apply)
+      + private_ipv6_google_access  = (known after apply)
+      + project                     = (known after apply)
+      + remove_default_node_pool    = true
+      + self_link                   = (known after apply)
+      + services_ipv4_cidr          = (known after apply)
+      + subnetwork                  = (known after apply)
+      + tpu_ipv4_cidr_block         = (known after apply)
+
+      + addons_config (known after apply)
+
+      + authenticator_groups_config (known after apply)
+
+      + cluster_autoscaling (known after apply)
+
+      + confidential_nodes (known after apply)
+
+      + cost_management_config (known after apply)
+
+      + database_encryption (known after apply)
+
+      + default_snat_status (known after apply)
+
+      + gateway_api_config (known after apply)
+
+      + ip_allocation_policy {
+          + cluster_ipv4_cidr_block       = (known after apply)
+          + cluster_secondary_range_name  = (known after apply)
+          + services_ipv4_cidr_block      = (known after apply)
+          + services_secondary_range_name = (known after apply)
+          + stack_type                    = "IPV4"
+
+          + pod_cidr_overprovision_config (known after apply)
+        }
+
+      + logging_config (known after apply)
+
+      + master_auth (known after apply)
+
+      + master_authorized_networks_config (known after apply)
+
+      + mesh_certificates (known after apply)
+
+      + monitoring_config (known after apply)
+
+      + node_config (known after apply)
+
+      + node_pool (known after apply)
+
+      + node_pool_auto_config (known after apply)
+
+      + node_pool_defaults (known after apply)
+
+      + notification_config (known after apply)
+
+      + release_channel (known after apply)
+
+      + security_posture_config (known after apply)
+
+      + service_external_ips_config (known after apply)
+
+      + vertical_pod_autoscaling (known after apply)
+
+      + workload_identity_config (known after apply)
+    }
+
+  # google_container_node_pool.primary_nodes will be created
+  + resource "google_container_node_pool" "primary_nodes" {
+      + cluster                     = "ecommerce-cluster"
+      + id                          = (known after apply)
+      + initial_node_count          = (known after apply)
+      + instance_group_urls         = (known after apply)
+      + location                    = "europe-west1-b"
+      + managed_instance_group_urls = (known after apply)
+      + max_pods_per_node           = (known after apply)
+      + name                        = "primary-node-pool"
+      + name_prefix                 = (known after apply)
+      + node_count                  = 1
+      + node_locations              = (known after apply)
+      + operation                   = (known after apply)
+      + project                     = (known after apply)
+      + version                     = (known after apply)
+
+      + autoscaling {
+          + location_policy = (known after apply)
+          + max_node_count  = 2
+          + min_node_count  = 1
+        }
+
+      + management {
+          + auto_repair  = true
+          + auto_upgrade = true
+        }
+
+      + network_config (known after apply)
+
+      + node_config {
+          + disk_size_gb      = (known after apply)
+          + disk_type         = (known after apply)
+          + guest_accelerator = (known after apply)
+          + image_type        = (known after apply)
+          + labels            = (known after apply)
+          + local_ssd_count   = (known after apply)
+          + logging_variant   = "DEFAULT"
+          + machine_type      = "e2-small"
+          + metadata          = (known after apply)
+          + min_cpu_platform  = (known after apply)
+          + oauth_scopes      = [
+              + "https://www.googleapis.com/auth/cloud-platform",
+            ]
+          + preemptible       = false
+          + service_account   = (known after apply)
+          + spot              = false
+          + taint             = (known after apply)
+
+          + confidential_nodes (known after apply)
+
+          + shielded_instance_config (known after apply)
+
+          + workload_metadata_config (known after apply)
+        }
+
+      + upgrade_settings (known after apply)
+    }
+
+  # kubernetes_deployment.backend will be created
+  + resource "kubernetes_deployment" "backend" {
+      + id               = (known after apply)
+      + wait_for_rollout = true
+
+      + metadata {
+          + generation       = (known after apply)
+          + labels           = {
+              + "app" = "backend"
+            }
+          + name             = "backend"
+          + namespace        = "default"
+          + resource_version = (known after apply)
+          + uid              = (known after apply)
+        }
+
+      + spec {
+          + min_ready_seconds         = 0
+          + paused                    = false
+          + progress_deadline_seconds = 600
+          + replicas                  = "2"
+          + revision_history_limit    = 10
+
+          + selector {
+              + match_labels = {
+                  + "app" = "backend"
+                }
+            }
+
+          + strategy (known after apply)
+
+          + template {
+              + metadata {
+                  + generation       = (known after apply)
+                  + labels           = {
+                      + "app" = "backend"
+                    }
+                  + name             = (known after apply)
+                  + resource_version = (known after apply)
+                  + uid              = (known after apply)
+                }
+              + spec {
+                  + automount_service_account_token  = true
+                  + dns_policy                       = "ClusterFirst"
+                  + enable_service_links             = true
+                  + host_ipc                         = false
+                  + host_network                     = false
+                  + host_pid                         = false
+                  + hostname                         = (known after apply)
+                  + node_name                        = (known after apply)
+                  + restart_policy                   = "Always"
+                  + scheduler_name                   = (known after apply)
+                  + service_account_name             = (known after apply)
+                  + share_process_namespace          = false
+                  + termination_grace_period_seconds = 30
+
+                  + container {
+                      + image                      = "europe-west1-docker.pkg.dev/zinc-mantra-460321-t3/repo/backend:latest"
+                      + image_pull_policy          = (known after apply)
+                      + name                       = "backend"
+                      + stdin                      = false
+                      + stdin_once                 = false
+                      + termination_message_path   = "/dev/termination-log"
+                      + termination_message_policy = (known after apply)
+                      + tty                        = false
+
+                      + env {
+                          + name  = "DB_HOST"
+                          + value = (known after apply)
+                        }
+                      + env {
+                          + name  = "DB_NAME"
+                          + value = "ecommerce"
+                        }
+                      + env {
+                          + name  = "NODE_ENV"
+                          + value = "development"
+                        }
+                      + env {
+                          + name = "DB_USER"
+
+                          + value_from {
+                              + secret_key_ref {
+                                  + key  = "username"
+                                  + name = "db-creds"
+                                }
+                            }
+                        }
+                      + env {
+                          + name = "DB_PASSWORD"
+
+                          + value_from {
+                              + secret_key_ref {
+                                  + key  = "password"
+                                  + name = "db-creds"
+                                }
+                            }
+                        }
+                      + env {
+                          + name = "SESSION_SECRET"
+
+                          + value_from {
+                              + secret_key_ref {
+                                  + key  = "session_secret"
+                                  + name = "backend-app-secret"
+                                }
+                            }
+                        }
+                      + env {
+                          + name = "MAILGUN_API_KEY"
+
+                          + value_from {
+                              + secret_key_ref {
+                                  + key  = "mailgun_api_key"
+                                  + name = "backend-app-secret"
+                                }
+                            }
+                        }
+
+                      + port {
+                          + container_port = 5000
+                          + protocol       = "TCP"
+                        }
+
+                      + resources {
+                          + limits   = {
+                              + "cpu"    = "500m"
+                              + "memory" = "512Mi"
+                            }
+                          + requests = {
+                              + "cpu"    = "100m"
+                              + "memory" = "128Mi"
+                            }
+                        }
+                    }
+
+                  + image_pull_secrets (known after apply)
+
+                  + readiness_gate (known after apply)
+                }
+            }
+        }
+    }
+
+  # kubernetes_deployment.frontend will be created
+  + resource "kubernetes_deployment" "frontend" {
+      + id               = (known after apply)
+      + wait_for_rollout = true
+
+      + metadata {
+          + generation       = (known after apply)
+          + labels           = {
+              + "app" = "frontend"
+            }
+          + name             = "frontend"
+          + namespace        = "default"
+          + resource_version = (known after apply)
+          + uid              = (known after apply)
+        }
+
+      + spec {
+          + min_ready_seconds         = 0
+          + paused                    = false
+          + progress_deadline_seconds = 600
+          + replicas                  = "2"
+          + revision_history_limit    = 10
+
+          + selector {
+              + match_labels = {
+                  + "app" = "frontend"
+                }
+            }
+
+          + strategy (known after apply)
+
+          + template {
+              + metadata {
+                  + generation       = (known after apply)
+                  + labels           = {
+                      + "app" = "frontend"
+                    }
+                  + name             = (known after apply)
+                  + resource_version = (known after apply)
+                  + uid              = (known after apply)
+                }
+              + spec {
+                  + automount_service_account_token  = true
+                  + dns_policy                       = "ClusterFirst"
+                  + enable_service_links             = true
+                  + host_ipc                         = false
+                  + host_network                     = false
+                  + host_pid                         = false
+                  + hostname                         = (known after apply)
+                  + node_name                        = (known after apply)
+                  + restart_policy                   = "Always"
+                  + scheduler_name                   = (known after apply)
+                  + service_account_name             = (known after apply)
+                  + share_process_namespace          = false
+                  + termination_grace_period_seconds = 30
+
+                  + container {
+                      + image                      = "europe-west1-docker.pkg.dev/zinc-mantra-460321-t3/repo/frontend:latest"
+                      + image_pull_policy          = (known after apply)
+                      + name                       = "frontend"
+                      + stdin                      = false
+                      + stdin_once                 = false
+                      + termination_message_path   = "/dev/termination-log"
+                      + termination_message_policy = (known after apply)
+                      + tty                        = false
+
+                      + env {
+                          + name  = "CHOKIDAR_USEPOLLING"
+                          + value = "true"
+                        }
+                      + env {
+                          + name  = "DANGEROUSLY_DISABLE_HOST_CHECK"
+                          + value = "true"
+                        }
+
+                      + port {
+                          + container_port = 3000
+                          + protocol       = "TCP"
+                        }
+
+                      + resources {
+                          + limits   = {
+                              + "cpu"    = "500m"
+                              + "memory" = "512Mi"
+                            }
+                          + requests = {
+                              + "cpu"    = "100m"
+                              + "memory" = "128Mi"
+                            }
+                        }
+                    }
+
+                  + image_pull_secrets (known after apply)
+
+                  + readiness_gate (known after apply)
+                }
+            }
+        }
+    }
+
+  # kubernetes_secret.backend_app_secret will be created
+  + resource "kubernetes_secret" "backend_app_secret" {
+      + binary_data_wo                 = (write-only attribute)
+      + data                           = (sensitive value)
+      + data_wo                        = (write-only attribute)
+      + id                             = (known after apply)
+      + type                           = "Opaque"
+      + wait_for_service_account_token = true
+
+      + metadata {
+          + generation       = (known after apply)
+          + name             = "backend-app-secret"
+          + namespace        = "default"
+          + resource_version = (known after apply)
+          + uid              = (known after apply)
+        }
+    }
+
+  # kubernetes_secret.db_creds will be created
+  + resource "kubernetes_secret" "db_creds" {
+      + binary_data_wo                 = (write-only attribute)
+      + data                           = (sensitive value)
+      + data_wo                        = (write-only attribute)
+      + id                             = (known after apply)
+      + type                           = "Opaque"
+      + wait_for_service_account_token = true
+
+      + metadata {
+          + generation       = (known after apply)
+          + name             = "db-creds"
+          + namespace        = "default"
+          + resource_version = (known after apply)
+          + uid              = (known after apply)
+        }
+    }
+
+  # kubernetes_service.backend will be created
+  + resource "kubernetes_service" "backend" {
+      + id                     = (known after apply)
+      + status                 = (known after apply)
+      + wait_for_load_balancer = true
+
+      + metadata {
+          + generation       = (known after apply)
+          + name             = "backend-service"
+          + namespace        = "default"
+          + resource_version = (known after apply)
+          + uid              = (known after apply)
+        }
+
+      + spec {
+          + allocate_load_balancer_node_ports = true
+          + cluster_ip                        = (known after apply)
+          + cluster_ips                       = (known after apply)
+          + external_traffic_policy           = (known after apply)
+          + health_check_node_port            = (known after apply)
+          + internal_traffic_policy           = (known after apply)
+          + ip_families                       = (known after apply)
+          + ip_family_policy                  = (known after apply)
+          + publish_not_ready_addresses       = false
+          + selector                          = {
+              + "app" = "backend"
+            }
+          + session_affinity                  = "None"
+          + type                              = "LoadBalancer"
+
+          + port {
+              + node_port   = (known after apply)
+              + port        = 5000
+              + protocol    = "TCP"
+              + target_port = "5000"
+            }
+
+          + session_affinity_config (known after apply)
+        }
+    }
+
+  # kubernetes_service.frontend will be created
+  + resource "kubernetes_service" "frontend" {
+      + id                     = (known after apply)
+      + status                 = (known after apply)
+      + wait_for_load_balancer = true
+
+      + metadata {
+          + generation       = (known after apply)
+          + name             = "frontend-service"
+          + namespace        = "default"
+          + resource_version = (known after apply)
+          + uid              = (known after apply)
+        }
+
+      + spec {
+          + allocate_load_balancer_node_ports = true
+          + cluster_ip                        = (known after apply)
+          + cluster_ips                       = (known after apply)
+          + external_traffic_policy           = (known after apply)
+          + health_check_node_port            = (known after apply)
+          + internal_traffic_policy           = (known after apply)
+          + ip_families                       = (known after apply)
+          + ip_family_policy                  = (known after apply)
+          + publish_not_ready_addresses       = false
+          + selector                          = {
+              + "app" = "frontend"
+            }
+          + session_affinity                  = "None"
+          + type                              = "LoadBalancer"
+
+          + port {
+              + node_port   = (known after apply)
+              + port        = 3000
+              + protocol    = "TCP"
+              + target_port = "3000"
+            }
+
+          + session_affinity_config (known after apply)
+        }
+    }
+
+Plan: 10 to add, 0 to change, 0 to destroy.
+
+Changes to Outputs:
+  + backend_service_ip   = (known after apply)
+  + frontend_service_ip  = (known after apply)
+  + gke_cluster_endpoint = (known after apply)
+  + gke_cluster_name     = "ecommerce-cluster"
+  + mysql_vm_ip          = (known after apply)
