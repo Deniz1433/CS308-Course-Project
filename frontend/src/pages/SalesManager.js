@@ -110,53 +110,52 @@ const SalesManager = () => {
         }
     };
 
+    const fetchProductById = async (productId) => {
+        try {
+            const response = await fetch(`/api/products/${productId}`);
+            if (!response.ok) throw new Error('Failed to fetch product');
+            return await response.json();
+        } catch (error) {
+            console.error('Error fetching product:', error);
+            return null;
+        }
+    };
+
     const handleApplyDiscount = async (productId) => {
-        const rate = parseFloat(discountRates[productId]);
-        if (isNaN(rate) || rate < 0 || rate > 100) {
-            alert('Please enter a valid discount rate (0�100)');
+        const discount = parseFloat(discountRates[productId]);
+
+        if (isNaN(discount) || discount < 0 || discount > 100) {
+            alert('Please enter a valid discount rate (0-100)');
             return;
         }
 
-        setUpdating(prev => ({ ...prev, [productId]: true }));
-
         try {
-            const response = await fetch(`/api/apply-discount/${productId}`, {
+            const discountResponse = await fetch(`/api/apply-discount/${productId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ discountRate: rate }),
+                body: JSON.stringify({ discountRate: discount }),
             });
 
-            if (response.ok) {
-                const product = products.find(p => p.id === productId);
-                const basePrice = parseFloat(
-                    product?.price
-                );
-
-                if (isNaN(basePrice) || basePrice <= 0) {
-                    alert("Invalid base price for discount calculation");
-                    return;
-                }
-
-                const final_price = (basePrice * (1 - rate / 100)).toFixed(2);
-
-                setProducts(prev =>
-                    prev.map(p =>
-                        p.id === productId
-                            ? { ...p, price: basePrice, final_price: final_price }
-                            : p
-                    )
-                );
-
-                alert('Discount applied successfully');
-            } else {
-                const result = await response.json();
-                alert(result.error || 'Failed to apply discount');
+            if (!discountResponse.ok) {
+                throw new Error('Failed to apply discount');
             }
-        } catch (err) {
-            console.error('Error applying discount:', err);
-            alert('An error occurred while applying the discount');
-        } finally {
-            setUpdating(prev => ({ ...prev, [productId]: false }));
+
+            const updatedProduct = await fetchProductById(productId);
+            if (!updatedProduct) {
+                alert('Failed to fetch updated product data.');
+                return;
+            }
+
+            setProducts(prevProducts =>
+                prevProducts.map(p =>
+                    p.id === productId ? updatedProduct : p
+                )
+            );
+
+            alert('Discount applied successfully');
+        } catch (error) {
+            console.error('Error applying discount:', error);
+            alert('Error applying discount');
         }
     };
 

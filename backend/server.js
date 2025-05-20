@@ -70,7 +70,7 @@ app.get("/api/products", requireAuth, (req, res) => {
 app.get('/api/unpriced-products', requireSalesManager, async (req, res) => {
   try {
     const [rows] = await pool.promise().query(
-      `SELECT * FROM products WHERE price IS NULL OR is_active = FALSE`
+      `SELECT * FROM products WHERE price IS NULL`
     );
     res.json(rows);
   } catch (err) {
@@ -98,14 +98,7 @@ app.put("/api/set-price/:id", requireSalesManager, async (req, res) => {
             return res.status(404).json({ error: "Product not found or inactive" });
         }
 
-        const discountRate = rows[0].discount_rate;
-
         let finalPrice = price;
-
-        // If there's already a discount applied, re-calculate final_price
-        if (discountRate && discountRate > 0) {
-            finalPrice = (price * (1 - discountRate / 100)).toFixed(2);
-        }
 
         // Update both price and final_price
         await pool.promise().query(
@@ -141,7 +134,7 @@ app.put("/api/apply-discount/:id", requireSalesManager, async (req, res) => {
         }
 
         // Calculate discounted price
-        const finalPrice = (originalPrice * (1 - discountRate / 100)).toFixed(2);
+        const finalPrice = Number((originalPrice * (1 - discountRate / 100)).toFixed(2));
 
         // Update final price in DB
         await pool.promise().query(

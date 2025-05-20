@@ -202,7 +202,7 @@ function ProductCardItem({ product, onAdd, onView, quantity, cartQuantity, onInc
             />
 
             {/* 🟥 Discount Badge */}
-            {product.final_price && product.final_price < product.price && (
+            {product.final_price && Number(product.final_price) < Number(product.price) && (
                 <Chip
                     label={`-${Math.round(100 * (1 - product.final_price / product.price))}%`}
                     color="error"
@@ -225,7 +225,7 @@ function ProductCardItem({ product, onAdd, onView, quantity, cartQuantity, onInc
           {product.description}
         </Typography>
 
-        {product.final_price && product.final_price < product.price ? (
+        {product.final_price && Number(product.final_price) < Number(product.price) ? (
             <Box sx={{ mt: 1 }}>
                 <Typography variant="body2" sx={{ textDecoration: 'line-through', color: 'gray' }}>
                     ${Number(product.price).toFixed(2)}
