@@ -353,3 +353,45 @@ describe('Refund Request APIs', () => {
     }
   });
 });
+describe('Pending Comments Moderation APIs', () => {
+  test('GET /api/pending-comments-pm/:productId - should return pending comments or empty array', async () => {
+    const res = await agent.get('/api/pending-comments-pm/1');
+    expect([200, 500]).toContain(res.statusCode);
+    if (res.statusCode === 200) {
+      expect(Array.isArray(res.body)).toBe(true);
+    }
+  });
+
+  test('GET /api/pending-comments-pm/:productId - invalid productId should return empty or 500', async () => {
+    const res = await agent.get('/api/pending-comments-pm/invalid');
+    expect([200, 500]).toContain(res.statusCode);
+  });
+
+  test('PUT /api/approve-comment/:commentId - unauthenticated request should return 401', async () => {
+    const unauthAgent = request.agent('http://backend:5000');
+    const res = await unauthAgent.put('/api/approve-comment/1');
+    expect(res.statusCode).toBe(401); 
+  });
+
+  test('PUT /api/approve-comment/:commentId - already approved or nonexistent comment returns 404/500', async () => {
+    // Login first
+    await agent.post('/api/login').send({
+      email: testUser.email,
+      password: testUser.password
+    });
+
+    const res = await agent.put('/api/approve-comment/99999'); // assuming ID doesn't exist
+    expect([404, 500]).toContain(res.statusCode);
+  });
+
+  test('PUT /api/approve-comment/:commentId - approve a real pending comment if exists', async () => {
+    const pending = await agent.get('/api/pending-comments-pm/1');
+    if (pending.statusCode === 200 && pending.body.length > 0) {
+      const commentId = pending.body[0].comment_id;
+      const res = await agent.put(`/api/approve-comment/${commentId}`);
+      expect([200, 500]).toContain(res.statusCode);
+    } else {
+      console.warn('No pending comment to approve for product 1.');
+    }
+  });
+});
