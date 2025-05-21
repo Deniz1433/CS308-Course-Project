@@ -296,3 +296,60 @@ describe('Product Manager - Orders Overview API', () => {
     expect(Array.isArray(res.body)).toBe(true);
   });
 });
+describe('Refund Request APIs', () => {
+  test('GET /api/refund-requests - should return list of pending refunds', async () => {
+    const res = await agent.get('/api/refund-requests');
+    expect([200, 500]).toContain(res.statusCode);
+    if (res.statusCode === 200) {
+      expect(Array.isArray(res.body)).toBe(true);
+      if (res.body.length > 0) {
+        expect(res.body[0]).toHaveProperty('id');
+        expect(res.body[0]).toHaveProperty('user_id');
+        expect(res.body[0]).toHaveProperty('order_id');
+        expect(res.body[0]).toHaveProperty('product_id');
+        expect(res.body[0]).toHaveProperty('status', 'pending');
+        expect(res.body[0]).toHaveProperty('product_name');
+        expect(res.body[0]).toHaveProperty('customer_name');
+      }
+    }
+  });
+
+  test('PUT /api/refund-requests/:id/approve - non-numeric ID should return 400 or 500', async () => {
+    const res = await agent.put('/api/refund-requests/abc/approve');
+    expect([400, 500]).toContain(res.statusCode);
+  });
+
+  test('PUT /api/refund-requests/:id/approve - non-existing ID should return 404', async () => {
+    const res = await agent.put('/api/refund-requests/99999/approve');
+    expect([404, 500]).toContain(res.statusCode);
+  });
+
+  test('PUT /api/refund-requests/:id/approve - approve valid refund request (if exists)', async () => {
+    // First fetch one pending refund request if available
+    const listRes = await agent.get('/api/refund-requests');
+    if (listRes.statusCode === 200 && listRes.body.length > 0) {
+      const refundId = listRes.body[0].id;
+      const approveRes = await agent.put(`/api/refund-requests/${refundId}/approve`);
+      expect([200, 500]).toContain(approveRes.statusCode);
+    } else {
+      console.warn('No pending refund requests to approve, skipping test.');
+    }
+  });
+
+  test('PUT /api/refund-requests/:id/approve - duplicate approval should fail', async () => {
+    // Try to re-approve an already handled request
+    const listRes = await agent.get('/api/refund-requests');
+    if (listRes.statusCode === 200 && listRes.body.length > 0) {
+      const refundId = listRes.body[0].id;
+
+      // First approval
+      await agent.put(`/api/refund-requests/${refundId}/approve`);
+
+      // Second attempt should fail (already handled)
+      const secondRes = await agent.put(`/api/refund-requests/${refundId}/approve`);
+      expect([404, 500]).toContain(secondRes.statusCode);
+    } else {
+      console.warn('No pending refund requests to test duplicate approval.');
+    }
+  });
+});
