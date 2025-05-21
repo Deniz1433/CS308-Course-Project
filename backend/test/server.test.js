@@ -395,3 +395,119 @@ describe('Pending Comments Moderation APIs', () => {
     }
   });
 });
+describe('Wishlist APIs', () => {
+  beforeAll(async () => {
+    await agent.post('/api/login').send({
+      email: testUser.email,
+      password: testUser.password
+    });
+  });
+
+  test('GET /api/wishlist - should fetch wishlist', async () => {
+    const res = await agent.get('/api/wishlist');
+    expect(res.statusCode).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+  });
+
+  test('POST /api/wishlist - should add a product to wishlist', async () => {
+    const res = await agent.post('/api/wishlist').send({ productId: 1 });
+    expect([200, 400]).toContain(res.statusCode);
+  });
+
+  test('DELETE /api/wishlist/:productId - should remove product from wishlist', async () => {
+    const res = await agent.delete('/api/wishlist/1');
+    expect([200, 404]).toContain(res.statusCode);
+  });
+
+  test('POST /api/wishlist without productId - should return 400', async () => {
+    const res = await agent.post('/api/wishlist').send({});
+    expect(res.statusCode).toBe(400);
+  });
+
+  test('GET /api/wishlist - should return 401 for unauthenticated user', async () => {
+    await agent.post('/api/logout');
+    const res = await agent.get('/api/wishlist');
+    expect(res.statusCode).toBe(401);
+  });
+
+  test('POST /api/wishlist - should return 401 for unauthenticated user', async () => {
+    const res = await agent.post('/api/wishlist').send({ productId: 1 });
+    expect(res.statusCode).toBe(401);
+  });
+
+  test('DELETE /api/wishlist/:productId - should return 401 for unauthenticated user', async () => {
+    const res = await agent.delete('/api/wishlist/1');
+    expect(res.statusCode).toBe(401);
+  });
+});
+
+describe('Invoice APIs', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const invoicesDir = path.join(__dirname, '../invoices');
+  const mockPdfPath = path.join(invoicesDir, 'invoice_123.pdf');
+
+  // Dummy Mailgun mock object
+  const mg = {
+    messages: () => ({
+      send: jest.fn()
+    })
+  };
+
+  beforeAll(() => {
+    if (!fs.existsSync(invoicesDir)) {
+      fs.mkdirSync(invoicesDir, { recursive: true });
+    }
+    fs.writeFileSync(mockPdfPath, 'PDF content');
+  });
+
+  afterAll(() => {
+    if (fs.existsSync(mockPdfPath)) {
+      fs.unlinkSync(mockPdfPath);
+    }
+  });
+
+  test('GET /api/invoice/:orderId - should return invoice PDF if exists', async () => {
+    const res = await agent.get('/api/invoice/123');
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['content-type']).toContain('application/pdf');
+  });
+
+  test('GET /api/invoice/:orderId - should return 404 if invoice does not exist', async () => {
+    const res = await agent.get('/api/invoice/999');
+    expect(res.statusCode).toBe(404);
+  });
+
+  test('GET /api/invoice/:orderId - malformed path should not crash', async () => {
+    const res = await agent.get('/api/invoice/../../../../etc/passwd');
+    expect([404, 500]).toContain(res.statusCode);
+  });
+
+  test('POST /api/invoice/:orderId/email - should return 401 if unauthenticated', async () => {
+    const unauthAgent = request.agent('http://backend:5000');
+    const res = await unauthAgent.post('/api/invoice/123/email');
+    expect(res.statusCode).toBe(401);
+  });
+
+  test('POST /api/invoice/:orderId/email - should return 404 if invoice file missing', async () => {
+    await agent.post('/api/login').send({
+      email: testUser.email,
+      password: testUser.password
+    });
+    const res = await agent.post('/api/invoice/999/email');
+    expect(res.statusCode).toBe(404);
+  });
+
+  test('POST /api/invoice/:orderId/email - should return 500 on Mailgun error', async () => {
+    jest.spyOn(mg.messages(), 'send').mockImplementation((data, cb) => cb(new Error('Mailgun failed')));
+    const res = await agent.post('/api/invoice/123/email');
+    expect(res.statusCode).toBe(500);
+  });
+
+  test('POST /api/invoice/:orderId/email - should send email successfully', async () => {
+    jest.spyOn(mg.messages(), 'send').mockImplementation((data, cb) => cb(null, { id: 'mock-id' }));
+    const res = await agent.post('/api/invoice/123/email');
+    expect(res.statusCode).toBe(200);
+    expect(res.body.message).toMatch(/success/i);
+  });
+});
