@@ -298,45 +298,87 @@ function ProductCardItem({ product, onAdd, onView, quantity, cartQuantity, onInc
   );
 }
 
-// 6. CartProvider context
 export const CartProvider = ({ children }) => {
+  // Initialize from localStorage (or empty array)
   const [cart, setCart] = useState(() => {
     const stored = localStorage.getItem('cart');
     return stored ? JSON.parse(stored) : [];
   });
 
+  // Persist to localStorage on every change
   useEffect(() => {
     localStorage.setItem('cart', JSON.stringify(cart));
   }, [cart]);
 
+  // Adds a product at the correct (possibly discounted) price
   const addToCart = (product, quantity) => {
-	  setCart(prev => {
-		const existing = prev.find(item => item.id === product.id);
-		const newQuantity = existing ? existing.quantity + quantity : quantity;
-		const finalQuantity = Math.min(newQuantity, product.stock); // 🚀 Prevent exceeding stock!
+    // Determine which price to charge
+    const priceToUse =
+      product.final_price != null && Number(product.final_price) < Number(product.price)
+        ? Number(product.final_price)
+        : Number(product.price);
 
-		if (existing) {
-		  return prev.map(item =>
-			item.id === product.id ? { ...item, quantity: finalQuantity } : item
-		  );
-		}
-		return [...prev, { ...product, quantity: finalQuantity }];
-	  });
-	};
+    setCart(prev => {
+      // See if it's already in the cart
+      const existing = prev.find(item => item.id === product.id);
+      const newQuantity = existing ? existing.quantity + quantity : quantity;
+      // Never exceed stock
+      const finalQuantity = Math.min(newQuantity, product.stock);
 
-  const removeFromCart = id => setCart(prev => prev.filter(item => item.id !== id));
-  const clearCart = () => setCart([]);
-  const updateCartQuantity = (id, quantity) => setCart(prev => prev.map(item =>
-    item.id === id ? { ...item, quantity } : item
-  ));
-  
+      if (existing) {
+        // Update the existing line
+        return prev.map(item =>
+          item.id === product.id
+            ? {
+                ...item,
+                quantity: finalQuantity,
+                price: priceToUse   // update price in case discount changed
+              }
+            : item
+        );
+      }
+
+      // New line item
+      return [
+        ...prev,
+        {
+          id:         product.id,
+          name:       product.name,
+          price:      priceToUse,
+          quantity:   finalQuantity,
+          image_path: product.image_path
+        }
+      ];
+    });
+  };
+
+  const removeFromCart = id => {
+    setCart(prev => prev.filter(item => item.id !== id));
+  };
+
+  const updateCartQuantity = (id, quantity) => {
+    setCart(prev =>
+      prev.map(item =>
+        item.id === id
+          ? { ...item, quantity: Math.min(quantity, /* you can re-use product.stock here */ quantity) }
+          : item
+      )
+    );
+  };
+
+  const clearCart = () => {
+    setCart([]);
+  };
 
   return (
-    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateCartQuantity, clearCart }}>
+    <CartContext.Provider
+      value={{ cart, addToCart, removeFromCart, updateCartQuantity, clearCart }}
+    >
       {children}
     </CartContext.Provider>
   );
 };
+
 
 // 7. ProductListing page
 function ProductListing() {

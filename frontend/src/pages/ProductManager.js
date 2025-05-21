@@ -110,7 +110,7 @@ const ProductManager = () => {
     serial_number: '',
     description: '',
     category_id: '',
-    price: '',
+    cost: '',
     stock: '',
     popularity: '',
     warranty_status: '',
@@ -301,7 +301,7 @@ const ProductManager = () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...newProduct,
-        price: parseFloat(price),
+        cost: parseFloat(newProduct.cost),
         stock: stock ? parseInt(stock, 10) : 0,
         popularity: popularity ? parseInt(popularity, 10) : 0,
       }),
@@ -316,7 +316,7 @@ const ProductManager = () => {
         serial_number,
         description,
         category_id,
-        price: parseFloat(price),
+        cost: parseFloat(newProduct.cost),
         stock: stock ? parseInt(stock, 10) : 0,
         warranty_status,
         distributor_info,
@@ -676,10 +676,10 @@ const ProductManager = () => {
                     <Grid item xs={12} sm={6}>
                       <TextField
                         fullWidth                        
-                        label="Price ($)"
+                        label="Cost ($)"
                         type="number"
                         value={newProduct.price}
-                        onChange={(e) => handleInputChange('price', e.target.value)}
+                        onChange={(e) => handleInputChange('cost', e.target.value)}
                         InputProps={{
                           inputProps: { min: 0, step: 0.01 }
                         }}
@@ -764,7 +764,21 @@ const ProductManager = () => {
           </Paper>
         ) : (
           <Grid container spacing={3}>
-            {products.map(product => (
+            {products.map(product => {
+              const displayPrice = product.final_price != null
+     ? Number(product.final_price)
+     : Number(product.price);
+              const basePrice = Number(product.price);
+            const finalPrice =
+              product.final_price != null
+                ? Number(product.final_price)
+                : basePrice;
+                // only compute a percent if finalPrice < basePrice
+const discountPercent =
+  basePrice > 0 && finalPrice < basePrice
+    ? Math.round((1 - finalPrice / basePrice) * 100)
+    : 0;
+           return(
               <Grid item xs={12} key={product.id}>
                 <Card elevation={2}>
                   <CardContent>
@@ -786,7 +800,15 @@ const ProductManager = () => {
                         </Box>
                         
                         <Stack direction="row" spacing={1} sx={{ mt: 1, mb: 2 }}>
-                          <Chip size="small" label={`$${product.price}`} color="primary" />
+                          <Chip size="small" label={`$${displayPrice.toFixed(2)}`} color="primary" />
+                           {discountPercent > 0 && (
+    <Chip
+      size="small"
+      label={`${discountPercent}% off`}
+      color="secondary"
+    />
+  )}
+                          <Chip size="small" label={`Cost: $${product.cost}`} color="warning" />
                           <Chip size="small" label={product.category} variant="outlined" />
                           <Chip 
                             size="small" 
@@ -931,7 +953,8 @@ const ProductManager = () => {
                   </CardContent>
                 </Card>
               </Grid>
-            ))}
+           );
+            })} 
           </Grid>
         )}
       </>
@@ -957,7 +980,6 @@ const ProductManager = () => {
           <Grid container spacing={3}>
             {orders.map(order => {
               const orderTotal = calculateOrderTotal(order.items);
-              
               return (
                 <Grid item xs={12} key={order.order_id}>
                   <Card elevation={2}>

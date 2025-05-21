@@ -52,20 +52,46 @@ const requireAuth = (req, res, next) => {
 };
 
 app.get("/api/products", requireAuth, (req, res) => {
-    const { unpricedOnly } = req.query;
+  const { unpricedOnly } = req.query;
 
-    let sql = "SELECT * FROM products WHERE price IS NOT NULL AND is_active = TRUE";
-    const params = [];
+  // 1. Explicitly list every column you want back
+  let sql = `
+    SELECT
+      id,
+      name,
+      description,
+      price,
+      final_price,
+      cost,
+      stock,
+      category_id,
+      model,
+      serial_number,
+      warranty_status,
+      distributor_info,
+      image_path,
+      popularity
+    FROM products
+    WHERE is_active = TRUE
+  `;
 
-    if (unpricedOnly === "true") {
-        sql += " AND (price IS NULL OR price = 0)";
+  const params = [];
+
+  // 2. If they only want the "unpriced" ones, narrow it further
+  if (unpricedOnly === "true") {
+    sql += " AND (price IS NULL OR price = 0)";
+  }
+
+  // 3. Run it
+  pool.query(sql, params, (err, results) => {
+    if (err) {
+      console.error("Database error:", err);
+      return res.status(500).json({ error: "Database error" });
     }
-
-    pool.query(sql, params, (err, results) => {
-        if (err) return res.status(500).json({ error: "Database error" });
-        res.json(results);
-    });
+    res.json(results);
+  });
 });
+
 
 app.get('/api/unpriced-products', requireSalesManager, async (req, res) => {
   try {
@@ -114,39 +140,73 @@ app.put("/api/set-price/:id", requireSalesManager, async (req, res) => {
 });
 
 
-app.put("/api/apply-discount/:id", requireSalesManager, async (req, res) => {
-    const productId = Number(req.params.id);
-    const { discountRate } = req.body;
+app.put('/api/apply-discount/:id', requireSalesManager, async (req, res) => {
+  const productId    = Number(req.params.id);
+  const discountRate = Number(req.body.discountRate);
+  if (isNaN(productId) || isNaN(discountRate) || discountRate <= 0 || discountRate >= 100) {
+    return res.status(400).json({ error: 'Invalid product ID or discount rate' });
+  }
 
-    if (isNaN(productId) || discountRate == null || isNaN(discountRate) || discountRate <= 0 || discountRate >= 100) {
-        return res.status(400).json({ error: "Invalid product ID or discount rate" });
+  const conn = await pool.promise().getConnection();
+  try {
+    // 1) fetch original price & name
+    const [[prod]] = await conn.query(
+      `SELECT name, price, final_price
+         FROM products
+        WHERE id = ? AND is_active = TRUE`,
+      [productId]
+    );
+
+    if (!prod || prod.price == null) {
+      conn.release();
+      return res.status(404).json({ error: 'Product not found or price not set' });
     }
 
-    try {
-        // Get original price
-        const [rows] = await pool.promise().query(
-            'SELECT price FROM products WHERE id = ? AND is_active = TRUE', [productId]
-        );
+    const basePrice = Number(prod.price);
+    const newFinal  = Number((basePrice * (1 - discountRate / 100)).toFixed(2));
 
-        const originalPrice = rows[0]?.price;
-        if (!originalPrice) {
-            return res.status(400).json({ error: 'Product not found or price not set' });
-        }
+    // 2) update product
+    await conn.query(
+      `UPDATE products
+          SET final_price  = ?, 
+              discount_rate = ?
+        WHERE id = ? AND is_active = TRUE`,
+      [newFinal, discountRate, productId]
+    );
 
-        // Calculate discounted price
-        const finalPrice = Number((originalPrice * (1 - discountRate / 100)).toFixed(2));
+    // 3) find wishlist owners
+    const [wishers] = await conn.query(
+      `SELECT u.email, u.name
+         FROM wishlists w
+         JOIN users u
+           ON u.id = w.user_id
+        WHERE w.product_id = ?`,
+      [productId]
+    );
 
-        // Update final price in DB
-        await pool.promise().query(
-            'UPDATE products SET final_price = ?, discount_rate = ? WHERE id = ? AND is_active = TRUE',
-            [finalPrice, discountRate, productId]
-        );
+    conn.release();
 
-        res.json({ message: 'Discount applied', final_price: finalPrice });
-    } catch (err) {
-        console.error('Error applying discount:', err);
-        res.status(500).json({ error: 'Failed to apply discount' });
-    }
+    // 4) email each wisher
+    wishers.forEach(({ email, name }) => {
+      mg.messages().send({
+        from:    process.env.EMAIL_FROM,
+        to:      email,
+        subject: `Good news — “${prod.name}” is ${discountRate}% off!`,
+        text:    `Hi ${name},\n\nYour wishlist item “${prod.name}” just dropped from $${basePrice.toFixed(2)} to $${newFinal.toFixed(2)}!\n\nGrab it before it’s gone!\n\nCheers,\nThe Team`
+      }, (err, body) => {
+        if (err) console.error('Mailgun wishlist-discount error:', err);
+      });
+    });
+
+    return res.json({
+      message:     'Discount applied and wishlisters notified',
+      final_price: newFinal
+    });
+  } catch (err) {
+    conn.release();
+    console.error('Error applying discount:', err);
+    return res.status(500).json({ error: 'Failed to apply discount' });
+  }
 });
 
 app.put("/api/cancel-discount/:id", requireSalesManager, async (req, res) => {
@@ -182,13 +242,6 @@ app.put("/api/cancel-discount/:id", requireSalesManager, async (req, res) => {
 });
 
 // ----- PRODUCT ROUTES -----
-
-app.get("/api/products", (req, res) => {
-  pool.query("SELECT * FROM products WHERE is_active = TRUE", (err, results) => {
-    if (err) return res.status(500).json({ error: "Database error" });
-    res.json(results);
-  });
-});
 
 app.get("/api/products/:id", (req, res) => {
   const id = Number(req.params.id);
@@ -408,9 +461,13 @@ app.post("/api/payment", async (req, res) => {
 
     for (const item of cart) {
       const [[prod]] = await conn.query(
-        "SELECT stock, price FROM products WHERE id = ?",
+        "SELECT stock, price, final_price FROM products WHERE id = ?",
         [item.id]
       );
+        const unitPrice = (prod.final_price != null && prod.final_price > 0)
+                  ? prod.final_price
+                  : prod.price;
+
       if (!prod || prod.stock < item.quantity) {
         throw new Error(`Invalid stock for product ${item.id}`);
       }
@@ -420,7 +477,7 @@ app.post("/api/payment", async (req, res) => {
       );
       await conn.query(
         "INSERT INTO order_items (order_id, product_id, quantity, price_at_time) VALUES (?,?,?,?)",
-        [orderId, item.id, item.quantity, prod.price]
+        [orderId, item.id, item.quantity, unitPrice]
       );
     }
 
@@ -542,6 +599,97 @@ app.get("/api/orders", async (req, res) => {
   } catch (err) {
     console.error("Fetch orders error:", err);
     res.status(500).json({ error: "Failed to fetch orders." });
+  }
+});
+app.get("/api/invoice", requireSalesManager, async (req, res) => {
+  const { start, end } = req.query;
+  if (!start || !end) {
+    return res.status(400).json({ error: "start and end dates are required" });
+  }
+
+  try {
+    // Sum up each order’s total = price_at_time * qty
+    const [rows] = await pool.promise().query(
+      `SELECT
+         o.id                     AS id,
+         o.order_date             AS date,     -- full DATETIME now
+         u.name                   AS customer,
+         SUM(oi.price_at_time * oi.quantity) AS total
+       FROM orders o
+       JOIN order_items oi ON oi.order_id = o.id
+       JOIN users u         ON u.id = o.user_id
+       WHERE DATE(o.order_date) BETWEEN ? AND ?
+       GROUP BY o.id, u.name, DATE(o.order_date)
+       ORDER BY o.order_date DESC`,
+      [start, end]
+    );
+
+    res.json(
+      rows.map(r => ({
+        id:       r.id,
+        date:     r.date,                // "2025-05-20"
+        customer: r.customer,
+        total:    Number(r.total)        // float
+      }))
+    );
+  } catch (err) {
+    console.error("Error fetching invoices:", err);
+    res.status(500).json({ error: "Failed to fetch invoices" });
+  }
+});
+app.get("/api/report", requireSalesManager, async (req, res) => {
+  const { start, end } = req.query;
+  if (!start || !end) {
+    return res.status(400).json({ error: "start and end dates are required" });
+  }
+
+  try {
+    const [rows] = await pool.promise().query(
+      `
+      SELECT
+        DATE(o.order_date) AS day,
+
+        -- Net revenue = sold revenue minus refunded revenue
+        SUM(
+          oi.price_at_time * oi.quantity
+          - IF(rr.id IS NOT NULL, oi.price_at_time * oi.quantity, 0)
+        ) AS revenue,
+
+        -- Net profit = (price−cost)×qty minus refunded profit
+        SUM(
+          (oi.price_at_time - p.cost) * oi.quantity
+          - IF(rr.id IS NOT NULL, (oi.price_at_time - p.cost) * oi.quantity, 0)
+        ) AS profit
+
+      FROM orders o
+      JOIN order_items oi
+        ON oi.order_id   = o.id
+      JOIN products p
+        ON p.id          = oi.product_id
+
+      -- join in any approved refund for that order/item
+      LEFT JOIN refund_requests rr
+        ON rr.order_id     = o.id
+       AND rr.product_id   = oi.product_id
+       AND rr.status       = 'approved'
+
+      WHERE DATE(o.order_date) BETWEEN ? AND ?
+      GROUP BY DATE(o.order_date)
+      ORDER BY DATE(o.order_date) ASC
+      `,
+      [start, end]
+    );
+
+    res.json(
+      rows.map(r => ({
+        day:     r.day,
+        revenue: Number(r.revenue),
+        profit:  Number(r.profit)
+      }))
+    );
+  } catch (err) {
+    console.error("Error fetching report:", err);
+    res.status(500).json({ error: "Failed to fetch report" });
   }
 });
 
@@ -875,6 +1023,12 @@ app.put("/api/user/profile", async (req, res) => {
     res.status(500).json({ error: "Failed to save profile" });
   }
 });
+app.get("/api/invoice/:orderId/pdf", requireSalesManager, (req, res) => {
+  const file = path.join(invoicesDir, `invoice_${req.params.orderId}.pdf`);
+  res.sendFile(file, err => {
+    if (err) return res.status(404).json({ error: "Invoice not found" });
+  });
+});
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
@@ -962,10 +1116,10 @@ app.delete('/api/delete-product/:productId', async (req, res) => {
 app.post('/api/add-product', async (req, res) => {
   const {
     name,
-
     description = null,
     category_id,
     price = null,
+    cost = 0.00,          // ← default cost
     stock = 0,
     popularity = 0,
     image_path = null,
@@ -976,30 +1130,21 @@ app.post('/api/add-product', async (req, res) => {
   } = req.body;
 
   if (!name || !category_id) {
-    return res.status(400).json({ error: 'Name, category are required' });
+    return res.status(400).json({ error: 'Name and category are required' });
   }
 
   try {
-
-    // Insert the product into the products table
     const [result] = await pool.promise().query(
-
       `INSERT INTO products
-        (name, description, category_id, price, stock, popularity, image_path,
-         model, serial_number, warranty_status, distributor_info)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (name,description,category_id,price,cost,stock,popularity,image_path,
+         model,serial_number,warranty_status,distributor_info)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
-        name,
-        description,
-        category_id,
-        price,
-        stock,
-        popularity,
-        image_path,
-        model,
-        serial_number,
-        warranty_status,
-        distributor_info
+        name, description, category_id,
+        price, cost,     // ← include cost here
+        stock, popularity, image_path,
+        model, serial_number,
+        warranty_status, distributor_info
       ]
     );
 
@@ -1046,13 +1191,21 @@ app.put('/api/update-stock/:productId', async (req, res) => {
 
 app.get('/api/orders-pm', async (req, res) => {
   try {
-    const [orders] = await pool.promise().query(
-      `SELECT o.id AS order_id, o.order_date, o.status, o.order_address, o.user_id,
-              oi.product_id, p.name AS product_name, oi.quantity, oi.price_at_time 
-       FROM orders o
-       JOIN order_items oi ON oi.order_id = o.id
-       JOIN products p ON p.id = oi.product_id`
-    );
+    const [orders] = await pool.promise().query(`
+  SELECT o.id   AS order_id,
+         o.order_date,
+         o.status,
+         o.order_address,
+         o.user_id,
+         oi.product_id,
+         p.name  AS product_name,
+         oi.quantity,
+         oi.price_at_time
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.id
+    JOIN products p     ON p.id        = oi.product_id
+   WHERE o.status NOT IN ('cancelled','refunded')
+`);
 
     // Group order items by order_id
     const detailedOrders = orders.reduce((acc, order) => {
@@ -1187,102 +1340,172 @@ app.post('/api/orders/:orderId/cancel', async (req, res) => {
   }
 });
 
-app.post('/api/refund-request', async (req, res) => {
-  const userId = req.session.user?.id;
-  const { orderId, productId } = req.body;
-
-  if (!userId) return res.status(401).json({ error: "Unauthorized" });
-
-  try {
-    // Verify the order and delivery status
-    const [[order]] = await pool.promise().query(
-      `SELECT status, order_date FROM orders WHERE id = ? AND user_id = ?`,
-      [orderId, userId]
-    );
-    if (!order || order.status !== 'delivered') {
-      return res.status(400).json({ error: "Refunds allowed only for delivered orders" });
-    }
-
-    const daysPassed = (Date.now() - new Date(order.order_date).getTime()) / (1000 * 60 * 60 * 24);
-    if (daysPassed > 30) {
-      return res.status(400).json({ error: "Refund request expired (30 days max)" });
-    }
-
-    await pool.promise().query(
-      `INSERT INTO refund_requests (user_id, order_id, product_id)
-       VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE status = 'pending'`,
-      [userId, orderId, productId]
-    );
-
-    res.json({ message: "Refund request submitted." });
-  } catch (err) {
-    console.error("Refund request error:", err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
 
 
-// Fetch all pending refund requests
-app.get('/api/refund-requests', async (req, res) => {
-  try {
-    const [rows] = await pool.promise().query(`
-      SELECT rr.id, rr.user_id, rr.order_id, rr.product_id, rr.status, rr.request_date,
-             p.name AS product_name, u.name AS customer_name
-      FROM refund_requests rr
-      JOIN products p ON p.id = rr.product_id
-      JOIN users u ON u.id = rr.user_id
-      WHERE rr.status = 'pending'
-      ORDER BY rr.request_date DESC
-    `);
-    res.json(rows);
-  } catch (err) {
-    console.error("Error fetching refund requests:", err);
-    res.status(500).json({ error: "Failed to fetch refund requests" });
-  }
-});
-
-// Approve refund request and update stock for the sales manager
 app.put('/api/refund-requests/:id/approve', async (req, res) => {
-  const refundId = req.params.id;
+  const refundId = Number(req.params.id);
+  if (isNaN(refundId)) {
+    return res.status(400).json({ error: 'Invalid refund ID' });
+  }
 
+  const conn = await pool.promise().getConnection();
   try {
-    const conn = await pool.promise().getConnection();
     await conn.beginTransaction();
 
-    // Get refund request details with quantity from order_items
+    // 1) load refund + quantity + user email/name
     const [[refund]] = await conn.query(
-      `SELECT rr.*, oi.quantity
-       FROM refund_requests rr
-       JOIN order_items oi ON oi.order_id = rr.order_id AND oi.product_id = rr.product_id
-       WHERE rr.id = ? AND rr.status = 'pending'`,
-      [refundId]
-    );
+  `SELECT
+     rr.user_id,
+     rr.order_id,
+     rr.product_id,
+     oi.quantity,
+     p.name    AS product_name,
+     u.email   AS user_email,
+     u.name    AS user_name
+   FROM refund_requests rr
+   JOIN order_items oi
+     ON oi.order_id   = rr.order_id
+    AND oi.product_id = rr.product_id
+   JOIN products p
+     ON p.id = rr.product_id
+   JOIN users u
+     ON u.id = rr.user_id
+   WHERE rr.id = ?
+     AND rr.status = 'pending'`,
+  [refundId]
+);
 
     if (!refund) {
       await conn.rollback();
+      conn.release();
       return res.status(404).json({ error: 'Refund request not found or already handled' });
     }
 
-    // Increase stock by the purchased quantity
+    // 2) restore stock
     await conn.query(
       'UPDATE products SET stock = stock + ? WHERE id = ?',
       [refund.quantity, refund.product_id]
     );
 
-    // Mark refund as approved
+    // 3) mark refund approved & stamp processed_at
     await conn.query(
-      'UPDATE refund_requests SET status = "approved" WHERE id = ?',
+      `UPDATE refund_requests
+          SET status       = 'approved',
+              processed_at = NOW()
+        WHERE id = ?`,
       [refundId]
     );
 
     await conn.commit();
-    res.json({ message: `Refund approved. Restored ${refund.quantity} unit(s) to stock.` });
+    conn.release();
+
+    // 4) fire-and-forget email
+    mg.messages().send({
+      from:    process.env.EMAIL_FROM,
+      to:      refund.user_email,
+      subject: `Your refund ${refundId} has been approved`,
+      text:    `Hi ${refund.user_name},\n\n` +
+               `Your refund for product ${refund.product_name} is now approved. ` +
+               `You should see your credit in 5–7 business days.\n\nThanks,\nThe Team`
+    }, err => {
+      if (err) console.error('Mailgun refund-approval error:', err);
+    });
+
+    return res.json({ message: 'Refund approved and user emailed.' });
+
   } catch (err) {
-    console.error("Approve refund error:", err);
-    res.status(500).json({ error: 'Failed to approve refund' });
+    await conn.rollback();
+    conn.release();
+    console.error('Approve refund error:', err);
+    return res.status(500).json({ error: 'Failed to approve refund' });
   }
 });
 
+
+
+app.post('/api/refund-requests', async (req, res) => {
+  const userId    = req.session.user?.id;
+  const { orderId, productId } = req.body;
+
+  if (!userId) {
+    return res.status(401).json({ error: 'Not logged in' });
+  }
+  if (!orderId || !productId) {
+    return res.status(400).json({ error: 'orderId and productId are required' });
+  }
+
+  try {
+    // Optional: verify that the order belongs to this user
+    const [[order]] = await pool.promise().query(
+      `SELECT status, order_date
+         FROM orders
+        WHERE id = ? AND user_id = ?`,
+      [orderId, userId]
+    );
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    if (order.status !== 'delivered') {
+      return res.status(400).json({ error: 'Only delivered orders can be refunded' });
+    }
+    // Optional: enforce 30-day refund window
+    const daysSince = Math.floor((Date.now() - new Date(order.order_date)) / (1000*60*60*24));
+    if (daysSince > 30) {
+      return res.status(400).json({ error: 'Refund window has closed' });
+    }
+
+    // Prevent duplicate requests
+    const [[existing]] = await pool.promise().query(
+      `SELECT 1 FROM refund_requests
+        WHERE user_id = ? AND order_id = ? AND product_id = ?`,
+      [userId, orderId, productId]
+    );
+    if (existing) {
+      return res.status(400).json({ error: 'Refund already requested for this item' });
+    }
+
+    // Insert the pending refund
+    await pool.promise().query(
+      `INSERT INTO refund_requests
+         (user_id, order_id, product_id, status, request_date)
+       VALUES (?, ?, ?, 'pending', NOW())`,
+      [userId, orderId, productId]
+    );
+
+    res.json({ message: 'Refund request submitted' });
+  } catch (err) {
+    console.error('Create refund error:', err);
+    res.status(500).json({ error: 'Failed to request refund' });
+  }
+});
+app.get('/api/refund-requests', async (req, res) => {
+  try {
+    const [rows] = await pool.promise().query(
+      `SELECT
+         rr.id,
+         rr.order_id,
+         rr.product_id,
+         oi.quantity,
+         p.name   AS product_name,
+         u.name   AS customer_name,
+         rr.request_date
+       FROM refund_requests rr
+       JOIN order_items oi
+         ON oi.order_id   = rr.order_id
+        AND oi.product_id = rr.product_id
+       JOIN products p
+         ON p.id = rr.product_id
+       JOIN users u
+         ON u.id = rr.user_id
+      WHERE rr.status = 'pending'
+      ORDER BY rr.request_date DESC`
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching refund requests:', err);
+    res.status(500).json({ error: 'Failed to fetch refund requests' });
+  }
+});
 
 app.post('/api/add-category', async (req, res) => {
   const { name } = req.body;
