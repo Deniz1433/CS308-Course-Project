@@ -158,7 +158,7 @@ const Orders = () => {
                           onClick={async () => {
                             if (!window.confirm("Are you sure you want to request a refund?")) return;
                             try {
-                              const res = await fetch('/api/refund-request', {
+                              const res = await fetch('/api/refund-requests', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 credentials: 'include',

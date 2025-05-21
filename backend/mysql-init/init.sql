@@ -218,7 +218,8 @@ VALUES
 (2, 2),  -- Bob is a product_manager
 (3, 3);  -- Charlie is a sales_manager
 
-
+ALTER TABLE refund_requests
+  ADD COLUMN processed_at DATETIME NULL AFTER status;
 
 UPDATE comments SET approved = TRUE WHERE approved IS NULL;
 
@@ -278,4 +279,17 @@ VALUES
 INSERT INTO ratings (product_id, user_id, rating)
 VALUES
   (7, 2, 4);
+UPDATE products
+SET cost = CASE
+  WHEN name = 'Laptop Pro'           THEN 850.00
+  WHEN name = 'Wireless Headphones'  THEN 120.00
+  WHEN name = 'Limited Edition Drone'THEN 600.00
+  WHEN name = 'Smartwatch X'         THEN 180.00
+  WHEN name = 'Smart Glasses'        THEN 300.00
+  WHEN name = 'Robot Vacuum Cleaner' THEN 250.00
+  WHEN name = 'Air Purifier Max'     THEN 150.00
+  ELSE cost
+
+
+END;
 
