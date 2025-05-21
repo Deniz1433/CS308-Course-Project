@@ -279,6 +279,37 @@ VALUES
 INSERT INTO ratings (product_id, user_id, rating)
 VALUES
   (7, 2, 4);
+  
+-- Orders by Alice (user_id = 1)
+INSERT INTO orders (user_id, order_address, status) VALUES
+(1, '2025-01-15 10:00:00', '123 Elm Street', 'delivered'),
+(1, '2025-03-10 14:30:00', '123 Elm Street', 'processing');
+
+-- Orders by Bob (user_id = 2)
+INSERT INTO orders (user_id, order_address, status) VALUES
+(2, '2025-02-20 09:00:00', '456 Oak Avenue', 'in-transit');
+
+-- Orders by Charlie (user_id = 3)
+INSERT INTO orders (user_id, order_address, status) VALUES
+(3, '2025-03-05 16:45:00', '789 Pine Road', 'cancelled');
+
+-- Order 1 by Alice (Delivered)
+INSERT INTO order_items (order_id, product_id, quantity, price_at_time) VALUES
+(1, 1, 1, 1299.99),   -- Laptop Pro
+(1, 2, 2, 199.99);    -- Wireless Headphones
+
+-- Order 2 by Alice (Processing)
+INSERT INTO order_items (order_id, product_id, quantity, price_at_time) VALUES
+(2, 4, 1, 299.99);    -- Smartwatch X
+
+-- Order 3 by Bob (In-Transit)
+INSERT INTO order_items (order_id, product_id, quantity, price_at_time) VALUES
+(3, 6, 1, 399.99),    -- Robot Vacuum Cleaner
+(3, 7, 1, 249.99);    -- Air Purifier Max
+
+-- Order 4 by Charlie (Cancelled)
+INSERT INTO order_items (order_id, product_id, quantity, price_at_time) VALUES
+(4, 5, 1, 499.99);    -- Smart Glasses
 UPDATE products
 SET cost = CASE
   WHEN name = 'Laptop Pro'           THEN 850.00
