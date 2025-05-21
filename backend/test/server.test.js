@@ -249,3 +249,50 @@ describe('Public Read-Only APIs - Additional Tests', () => {
     expect(res.statusCode).toBe(500);
   });
 });
+describe('Product Manager - Orders Overview API', () => {
+  test('GET /api/orders-pm - should return 200 and an array', async () => {
+    const res = await agent.get('/api/orders-pm');
+    expect(res.statusCode).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+  });
+
+  test('GET /api/orders-pm - each order should have items array', async () => {
+    const res = await agent.get('/api/orders-pm');
+    expect(res.statusCode).toBe(200);
+    if (res.body.length > 0) {
+      expect(res.body[0]).toHaveProperty('items');
+      expect(Array.isArray(res.body[0].items)).toBe(true);
+    }
+  });
+
+  test('GET /api/orders-pm - orders should have required fields', async () => {
+    const res = await agent.get('/api/orders-pm');
+    expect(res.statusCode).toBe(200);
+    if (res.body.length > 0) {
+      const order = res.body[0];
+      expect(order).toHaveProperty('order_id');
+      expect(order).toHaveProperty('order_date');
+      expect(order).toHaveProperty('status');
+      expect(order).toHaveProperty('order_address');
+      expect(order).toHaveProperty('user_id');
+    }
+  });
+
+  test('GET /api/orders-pm - each item should have product info', async () => {
+    const res = await agent.get('/api/orders-pm');
+    expect(res.statusCode).toBe(200);
+    if (res.body.length > 0 && res.body[0].items.length > 0) {
+      const item = res.body[0].items[0];
+      expect(item).toHaveProperty('product_id');
+      expect(item).toHaveProperty('product_name');
+      expect(item).toHaveProperty('quantity');
+      expect(item).toHaveProperty('price_at_time');
+    }
+  });
+
+  test('GET /api/orders-pm - should handle empty result gracefully', async () => {
+    const res = await agent.get('/api/orders-pm');
+    expect(res.statusCode).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+  });
+});
