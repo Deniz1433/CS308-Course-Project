@@ -47,19 +47,17 @@ resource "kubernetes_deployment" "backend" {
 
           port { container_port = 5000 }
 
-          # ← resource requests & limits
-          resources {
-            requests = {
-              cpu    = "100m"
-              memory = "128Mi"
-            }
-            limits = {
-              cpu    = "500m"
-              memory = "512Mi"
-            }
-          }
+          #resources {
+            #requests = {
+              #cpu    = "100m"
+              #memory = "128Mi"
+            #}
+            #limits = {
+              #cpu    = "500m"
+              #memory = "512Mi"
+            #}
+          #}
 
-          # non-secret envs
           env {
             name  = "DB_HOST"
             value = google_compute_instance.mysql_vm.network_interface[0].network_ip
@@ -73,7 +71,6 @@ resource "kubernetes_deployment" "backend" {
             value = var.node_env
           }
 
-          # DB creds from Secret
           env {
             name = "DB_USER"
             value_from {
@@ -93,7 +90,6 @@ resource "kubernetes_deployment" "backend" {
             }
           }
 
-          # session & API key from Secret
           env {
             name = "SESSION_SECRET"
             value_from {
@@ -130,8 +126,7 @@ resource "kubernetes_service" "backend" {
     }
 
     type = "LoadBalancer"
-	
-	session_affinity = "ClientIP"
+    session_affinity = "ClientIP"
   }
 }
 
@@ -160,16 +155,16 @@ resource "kubernetes_deployment" "frontend" {
 
           port { container_port = 80 }
 
-          resources {
-            requests = {
-              cpu    = "250m"
-              memory = "512Mi"
-            }
-            limits = {
-              cpu    = "1000m"
-              memory = "1Gi"
-            }
-          }
+          #resources {
+            #requests = {
+              #cpu    = "250m"
+              #memory = "512Mi"
+            #}
+            #limits = {
+              #cpu    = "1000m"
+              #memory = "1Gi"
+            #}
+          #}
 
           env {
             name  = "CHOKIDAR_USEPOLLING"
@@ -179,11 +174,11 @@ resource "kubernetes_deployment" "frontend" {
             name  = "DANGEROUSLY_DISABLE_HOST_CHECK"
             value = tostring(var.dangerously_disable_host_check)
           }
-		  env {
+          env {
             name  = "HOST"
             value = "0.0.0.0"
           }
-		  env {
+          env {
             name  = "PORT"
             value = "3000"
           }
@@ -205,5 +200,63 @@ resource "kubernetes_service" "frontend" {
     }
 
     type = "LoadBalancer"
+  }
+}
+
+# Horizontal Pod Autoscaler for Backend
+resource "kubernetes_horizontal_pod_autoscaler_v2" "backend_hpa" {
+  metadata {
+    name = "backend-hpa"
+  }
+
+  spec {
+    scale_target_ref {
+      api_version = "apps/v1"
+      kind        = "Deployment"
+      name        = kubernetes_deployment.backend.metadata[0].name
+    }
+
+    min_replicas = 2
+    max_replicas = 10
+
+    metric {
+      type = "Resource"
+      resource {
+        name = "cpu"
+        target {
+          type               = "Utilization"
+          average_utilization = 60
+        }
+      }
+    }
+  }
+}
+
+# Horizontal Pod Autoscaler for Frontend
+resource "kubernetes_horizontal_pod_autoscaler_v2" "frontend_hpa" {
+  metadata {
+    name = "frontend-hpa"
+  }
+
+  spec {
+    scale_target_ref {
+      api_version = "apps/v1"
+      kind        = "Deployment"
+      name        = kubernetes_deployment.frontend.metadata[0].name
+    }
+
+    min_replicas = 2
+    max_replicas = 10
+
+    metric {
+      type = "Resource"
+      resource {
+        name = "cpu"
+        target {
+          type               = "Utilization"
+          average_utilization = 60
+        }
+      }
+    }
   }
 }
