@@ -221,7 +221,7 @@ VALUES
 
 
 UPDATE comments SET approved = TRUE WHERE approved IS NULL;
-
+ALTER TABLE refund_requests ADD COLUMN processed_at DATETIME NULL AFTER status;
 
 -- Comments for Laptop Pro (product_id = 1)
 INSERT INTO comments (product_id, user_id, comment_text, approved)
@@ -310,4 +310,17 @@ INSERT INTO order_items (order_id, product_id, quantity, price_at_time) VALUES
 INSERT INTO order_items (order_id, product_id, quantity, price_at_time) VALUES
 (4, 5, 1, 499.99);    -- Smart Glasses
 
+UPDATE products
+SET cost = CASE
+  WHEN name = 'Laptop Pro'           THEN 850.00
+  WHEN name = 'Wireless Headphones'  THEN 120.00
+  WHEN name = 'Limited Edition Drone'THEN 600.00
+  WHEN name = 'Smartwatch X'         THEN 180.00
+  WHEN name = 'Smart Glasses'        THEN 300.00
+  WHEN name = 'Robot Vacuum Cleaner' THEN 250.00
+  WHEN name = 'Air Purifier Max'     THEN 150.00
+  ELSE cost
+
+
+END;
 
