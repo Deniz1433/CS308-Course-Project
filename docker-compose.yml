@@ -33,7 +33,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ecommerce
       SESSION_SECRET: secret123 # Optional but useful
-    command: npx nodemon server.js
+    command: sh -c "npm ci && npx nodemon server.js"
 
   backend-test:
     build: ./backend
@@ -68,7 +68,7 @@ services:
       - backend
     environment:
       - CHOKIDAR_USEPOLLING=true
-    command: npm start
+    command: sh -c "npm ci && npm start"
 
 volumes:
   db_data:
