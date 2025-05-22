@@ -218,10 +218,11 @@ VALUES
 (2, 2),  -- Bob is a product_manager
 (3, 3);  -- Charlie is a sales_manager
 
-
+ALTER TABLE refund_requests
+  ADD COLUMN processed_at DATETIME NULL AFTER status;
 
 UPDATE comments SET approved = TRUE WHERE approved IS NULL;
-ALTER TABLE refund_requests ADD COLUMN processed_at DATETIME NULL AFTER status;
+
 
 -- Comments for Laptop Pro (product_id = 1)
 INSERT INTO comments (product_id, user_id, comment_text, approved)
@@ -279,42 +280,11 @@ INSERT INTO ratings (product_id, user_id, rating)
 VALUES
   (7, 2, 4);
 
--- Orders by Alice (user_id = 1)
-INSERT INTO orders (user_id, order_address, status) VALUES
-(1, '2025-01-15 10:00:00', '123 Elm Street', 'delivered'),
-(1, '2025-03-10 14:30:00', '123 Elm Street', 'processing');
-
--- Orders by Bob (user_id = 2)
-INSERT INTO orders (user_id, order_address, status) VALUES
-(2, '2025-02-20 09:00:00', '456 Oak Avenue', 'in-transit');
-
--- Orders by Charlie (user_id = 3)
-INSERT INTO orders (user_id, order_address, status) VALUES
-(3, '2025-03-05 16:45:00', '789 Pine Road', 'cancelled');
-
--- Order 1 by Alice (Delivered)
-INSERT INTO order_items (order_id, product_id, quantity, price_at_time) VALUES
-(1, 1, 1, 1299.99),   -- Laptop Pro
-(1, 2, 2, 199.99);    -- Wireless Headphones
-
--- Order 2 by Alice (Processing)
-INSERT INTO order_items (order_id, product_id, quantity, price_at_time) VALUES
-(2, 4, 1, 299.99);    -- Smartwatch X
-
--- Order 3 by Bob (In-Transit)
-INSERT INTO order_items (order_id, product_id, quantity, price_at_time) VALUES
-(3, 6, 1, 399.99),    -- Robot Vacuum Cleaner
-(3, 7, 1, 249.99);    -- Air Purifier Max
-
--- Order 4 by Charlie (Cancelled)
-INSERT INTO order_items (order_id, product_id, quantity, price_at_time) VALUES
-(4, 5, 1, 499.99);    -- Smart Glasses
-
 UPDATE products
 SET cost = CASE
   WHEN name = 'Laptop Pro'           THEN 850.00
   WHEN name = 'Wireless Headphones'  THEN 120.00
-  WHEN name = 'Limited Edition Drone'THEN 600.00
+  WHEN name = 'Limited Edition Drone' THEN 600.00
   WHEN name = 'Smartwatch X'         THEN 180.00
   WHEN name = 'Smart Glasses'        THEN 300.00
   WHEN name = 'Robot Vacuum Cleaner' THEN 250.00
@@ -324,3 +294,46 @@ SET cost = CASE
 
 END;
 
+INSERT INTO users (name, email, home_address, password)
+VALUES
+('Deniz Yavuzgil', 'deniz.yavuzgil@sabanciuniv.edu', 'Dummy Address', '$2a$10$PxQGXXccLlv7gLT5NmMKRO9LlaJvRWHvghsBTnSZgdxhJq4uRLHZa');
+SET @deniz_id = LAST_INSERT_ID();
+INSERT INTO user_roles (user_id, role_id)
+VALUES (@deniz_id, 1);
+
+SELECT id INTO @deniz_id
+  FROM users
+ WHERE email = 'deniz.yavuzgil@sabanciuniv.edu';
+ 
+ -- 2) Old delivered order (> 1 month ago), 2×Product 1 (“E”)
+INSERT INTO orders (user_id, order_address, order_date, status)
+VALUES (@deniz_id, '123 Fake St', DATE_SUB(NOW(), INTERVAL 45 DAY), 'delivered');
+SET @o1 = LAST_INSERT_ID();
+INSERT INTO order_items (order_id, product_id, quantity, price_at_time)
+VALUES 
+  (@o1, 1, 2, (SELECT COALESCE(final_price, price) FROM products WHERE id=1));
+
+-- 3) Recent delivered (< 1 month ago), 1×Product 4 (“F”)
+INSERT INTO orders (user_id, order_address, order_date, status)
+VALUES (@deniz_id, '123 Fake St', DATE_SUB(NOW(), INTERVAL 10 DAY), 'delivered');
+SET @o2 = LAST_INSERT_ID();
+INSERT INTO order_items (order_id, product_id, quantity, price_at_time)
+VALUES
+  (@o2, 4, 1, (SELECT COALESCE(final_price, price) FROM products WHERE id=4));
+-- 4) Processing now, 1×Product 6 (“G”)
+INSERT INTO orders (user_id, order_address, order_date, status)
+VALUES (@deniz_id, '123 Fake St', NOW(), 'processing');
+SET @o3 = LAST_INSERT_ID();
+
+INSERT INTO order_items (order_id, product_id, quantity, price_at_time)
+VALUES
+  (@o3, 6, 1, (SELECT COALESCE(final_price, price) FROM products WHERE id=6));
+
+-- 5) In-transit now, 1×Product 7 (“H”)
+INSERT INTO orders (user_id, order_address, order_date, status)
+VALUES (@deniz_id, '123 Fake St', NOW(), 'in-transit');
+SET @o4 = LAST_INSERT_ID();
+
+INSERT INTO order_items (order_id, product_id, quantity, price_at_time)
+VALUES
+  (@o4, 7, 1, (SELECT COALESCE(final_price, price) FROM products WHERE id=7));
