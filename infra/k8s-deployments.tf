@@ -43,7 +43,7 @@ resource "kubernetes_deployment" "backend" {
       spec {
         container {
           name  = "backend"
-          image = "europe-west1-docker.pkg.dev/zinc-mantra-460321-t3/repo/backend:latest"
+          image = "docker.io/deniziy/backend:latest"
 
           port { container_port = 5000 }
 
@@ -151,7 +151,7 @@ resource "kubernetes_deployment" "frontend" {
       spec {
         container {
           name  = "frontend"
-          image = "europe-west1-docker.pkg.dev/zinc-mantra-460321-t3/repo/frontend-prod:latest"
+          image = "docker.io/deniziy/frontend-prod:latest"
 
           port { container_port = 80 }
 
