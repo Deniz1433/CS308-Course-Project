@@ -75,6 +75,7 @@ const ProductManager = () => {
   const [deletingCategory, setDeletingCategory] = useState({});
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState({});
   
   const [uploadedImageName, setUploadedImageName] = useState('');
 	const { getRootProps, getInputProps } = useDropzone({
@@ -131,6 +132,10 @@ const ProductManager = () => {
       const res = await fetch('/api/categories');
       const data = await res.json();
       setCategories(data); // Updates the categories state
+      const others = data.find((cat) => cat.name === 'Others');
+      if (others) {
+        setNewProduct((prev) => ({ ...prev, category_id: others.id }));
+      }
     } catch (error) {
       console.error("Failed to fetch categories", error);
     }
@@ -151,7 +156,7 @@ const ProductManager = () => {
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/products');
+      const response = await fetch('/api/products-pm');
       const data = await response.json();
       setProducts(data);
     } catch (error) {
@@ -374,23 +379,29 @@ const ProductManager = () => {
     }
   };
 
+  
   const handleUpdateOrderStatus = async (orderId, newStatus) => {
     setOrderStatusUpdating(prev => ({ ...prev, [orderId]: true }));
     
     try {
+      const updatePayload = { status: newStatus }; // No delivery_id here
+  
       const response = await fetch(`/api/orders-pm/${orderId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify(updatePayload),
       });
-
+  
       if (response.ok) {
-        // Update local state
-        setOrders(prevOrders => 
-          prevOrders.map(order => 
-            order.order_id === orderId ? { ...order, status: newStatus } : order
+        const result = await response.json(); // Receive delivery_id if created
+        setOrders(prevOrders =>
+          prevOrders.map(order =>
+            order.order_id === orderId 
+              ? { ...order, status: newStatus, ...(result.delivery_id && { delivery_id: result.delivery_id }) }
+              : order
           )
         );
+  
       } else {
         const result = await response.json();
         alert(result.error || 'Failed to update order status');
@@ -402,6 +413,7 @@ const ProductManager = () => {
       setOrderStatusUpdating(prev => ({ ...prev, [orderId]: false }));
     }
   };
+  
 
   const handleInputChange = (field, value) => {
     setNewProduct(prev => ({ ...prev, [field]: value }));
@@ -409,10 +421,18 @@ const ProductManager = () => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'processing': return 'info';
-      case 'in-transit': return 'warning';
-      case 'delivered': return 'success';
-      default: return 'default';
+      case 'processing':
+        return 'info';       // Ongoing process
+      case 'in-transit':
+        return 'primary';    // Actively on the way
+      case 'delivered':
+        return 'success';    // Completed successfully
+      case 'cancelled':
+        return 'error';      // User/system cancelled
+      case 'refunded':
+        return 'warning';    // Money returned, potentially negative
+      default:
+        return 'default';    // Unknown or undefined status
     }
   };
 
@@ -456,7 +476,7 @@ const ProductManager = () => {
           prevCategories.filter(category => category.id !== categoryId)
         );
         setShowDeleteConfirmation(false);
-        alert('Category deleted successfully and associated products deactivated');
+        alert('Category deleted successfully and associated products assigned to others');
         fetchProducts(); // Refresh products list to show updated status
       } else {
         const result = await response.json();
@@ -467,6 +487,50 @@ const ProductManager = () => {
       alert('An error occurred while deleting the category');
     } finally {
       setDeletingCategory(prev => ({ ...prev, [categoryId]: false }));
+    }
+  };
+
+  const handleCategorySelectChange = (productId, categoryId) => {
+    setSelectedCategory(prev => ({
+      ...prev,
+      [productId]: categoryId
+    }));
+  };
+  
+  const handleUpdateCategory = async (productId) => {
+    try {
+      const categoryId = selectedCategory[productId];
+      
+      if (!categoryId) return;
+      
+      const response = await fetch(`/api/products/${productId}/assign-category`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ categoryId }),
+      });
+  
+      if (response.ok) {
+        // Update product in state with new category
+        setProducts(products.map(prod => 
+          prod.id === productId 
+            ? { 
+                ...prod, 
+                category_id: categoryId,
+                category: categories.find(cat => cat.id === categoryId)?.name || prod.category
+              }
+            : prod
+        ));
+        
+        alert('Category updated successfully', { variant: 'success' });
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to update category', { variant: 'error' });
+      }
+    } catch (error) {
+      console.error('Error updating category:', error);
+      alert('Failed to update category', { variant: 'error' });
     }
   };
   
@@ -751,61 +815,63 @@ const ProductManager = () => {
         </Card>
 
 
-        {/* Products List */}
-        <Typography variant="h5" gutterBottom sx={{ mb: 3 }}>
-          Products ({products.length})
-        </Typography>
-        
         {products.length === 0 ? (
-          <Paper elevation={1} sx={{ p: 4, textAlign: 'center' }}>
-            <Typography variant="body1" color="text.secondary">
-              No products available. Add a new product to get started.
-            </Typography>
-          </Paper>
-        ) : (
-          <Grid container spacing={3}>
-            {products.map(product => (
-              <Grid item xs={12} key={product.id}>
-                <Card elevation={2}>
-                  <CardContent>
-                    <Grid container spacing={2}>
-                      <Grid item xs={12} sm={8}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <Typography variant="h6" component="div">
-                            {product.name}
-                          </Typography>
-                          <IconButton
-                            color="error"
-                            onClick={() => handleDeleteProduct(product.id)}
-                            size="small"
-                            sx={{ ml: 1 }}
-                            title="Delete Product"
-                          >
-                            <DeleteIcon />
-                          </IconButton>
-                        </Box>
-                        
-                        <Stack direction="row" spacing={1} sx={{ mt: 1, mb: 2 }}>
-                          <Chip size="small" label={`$${product.price}`} color="primary" />
-                          <Chip size="small" label={product.category} variant="outlined" />
-                          <Chip 
-                            size="small" 
-                            icon={<InventoryIcon sx={{ fontSize: '0.8rem' }} />} 
-                            label={`Stock: ${product.stock}`} 
-                            variant="outlined"
-                            color={product.stock > 5 ? "success" : product.stock > 0 ? "warning" : "error"}
-                          />
-                        </Stack>
-                        
-                        {product.description && (
-                          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                            {product.description}
-                          </Typography>
-                        )}
-                      </Grid>
+        <Paper elevation={1} sx={{ p: 4, textAlign: 'center' }}>
+          <Typography variant="body1" color="text.secondary">
+            No products available. Add a new product to get started.
+          </Typography>
+        </Paper>
+      ) : (
+        <Grid container spacing={3}>
+          {products.map(product => (
+            <Grid item xs={12} key={product.id}>
+              <Card elevation={2}>
+                <CardContent>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={8}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Typography variant="h6" component="div">
+                          {product.name}
+                        </Typography>
+                        <IconButton
+                          color="error"
+                          onClick={() => handleDeleteProduct(product.id)}
+                          size="small"
+                          sx={{ ml: 1 }}
+                          title="Delete Product"
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </Box>
                       
-                      <Grid item xs={12} sm={4}>
-                        <Paper variant="outlined" sx={{ p: 2 }}>
+                      <Stack direction="row" spacing={1} sx={{ mt: 1, mb: 2 }}>
+                        <Chip size="small" label={`$${product.price}`} color="primary" />
+                        <Chip 
+                          size="small" 
+                          label={product.category} 
+                          variant="outlined" 
+                          color="secondary"
+                          icon={<CategoryIcon sx={{ fontSize: '0.8rem' }} />}
+                        />
+                        <Chip 
+                          size="small" 
+                          icon={<InventoryIcon sx={{ fontSize: '0.8rem' }} />} 
+                          label={`Stock: ${product.stock}`} 
+                          variant="outlined"
+                          color={product.stock > 5 ? "success" : product.stock > 0 ? "warning" : "error"}
+                        />
+                      </Stack>
+                      
+                      {product.description && (
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                          {product.description}
+                        </Typography>
+                      )}
+                    </Grid>
+                    
+                    <Grid item xs={12} sm={4}>
+                      <Paper variant="outlined" sx={{ p: 2 }}>
+                        <Box sx={{ mb: 2 }}>
                           <Typography variant="subtitle2" gutterBottom>
                             Update Stock
                           </Typography>
@@ -843,9 +909,43 @@ const ProductManager = () => {
                               Update
                             </Button>
                           </Box>
-                        </Paper>
-                      </Grid>
+                        </Box>
+                        
+                        <Box>
+                          <Typography variant="subtitle2" gutterBottom>
+                            Change Category
+                          </Typography>
+                          <Box sx={{ display: 'flex', gap: 1 }}>
+                            <FormControl size="small" fullWidth>
+                              <Select
+                                value={selectedCategory[product.id] || product.category_id || ''}
+                                onChange={(e) => handleCategorySelectChange(product.id, e.target.value)}
+                                displayEmpty
+                              >
+                                <MenuItem value="" disabled>
+                                  <em>Select category</em>
+                                </MenuItem>
+                                {categories.map((category) => (
+                                  <MenuItem key={category.id} value={category.id}>
+                                    {category.name}
+                                  </MenuItem>
+                                ))}
+                              </Select>
+                            </FormControl>
+                            <Button
+                              variant="contained"
+                              color="secondary"
+                              size="small"
+                              onClick={() => handleUpdateCategory(product.id)}
+                              disabled={!selectedCategory[product.id] || selectedCategory[product.id] === product.category_id}
+                            >
+                              Assign
+                            </Button>
+                          </Box>
+                        </Box>
+                      </Paper>
                     </Grid>
+                  </Grid>
 
                     <Divider sx={{ my: 2 }} />
                     
@@ -1032,7 +1132,11 @@ const ProductManager = () => {
                                   value={order.status}
                                   label="Status"
                                   onChange={(e) => handleUpdateOrderStatus(order.order_id, e.target.value)}
-                                  disabled={orderStatusUpdating[order.order_id]}
+                                  disabled={
+                                    orderStatusUpdating[order.order_id] ||
+                                    order.status === 'cancelled' ||
+                                    order.status === 'refunded'
+                                  }
                                 >
                                   {orderStatusOptions.map(status => (
                                     <MenuItem key={status} value={status}>
@@ -1051,6 +1155,15 @@ const ProductManager = () => {
                               {order.status === 'delivered' && (
                                 <Alert severity="success" sx={{ mt: 2, py: 0 }}>
                                   Delivery completed
+                                </Alert>
+                              )}
+                              {order.status === 'in-transit' && order.delivery_id && (
+                                <Alert severity="info" sx={{ mt: 2, py: 1 }}>
+                                  <Box>
+                                    <Typography variant="body2" fontWeight="bold">
+                                      Delivery ID: {order.delivery_id}
+                                    </Typography>
+                                  </Box>
                                 </Alert>
                               )}
                             </Paper>
@@ -1146,7 +1259,7 @@ const ProductManager = () => {
         <DialogContent>
           <DialogContentText>
             Are you sure you want to delete the category "{categoryToDelete?.name}"? 
-            All products in this category will be deleted.
+            All products in this category will be assigned to Others.
           </DialogContentText>
         </DialogContent>
         <DialogActions>

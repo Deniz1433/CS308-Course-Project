@@ -87,6 +87,7 @@ CREATE TABLE IF NOT EXISTS discounts (
 CREATE TABLE IF NOT EXISTS orders (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,
+  delivery_id VARCHAR(25) DEFAULT NULL,
   order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   order_address VARCHAR(255) DEFAULT NULL,
   status ENUM('processing', 'delivered', 'cancelled', 'refunded', 'in-transit') DEFAULT 'processing',
@@ -171,9 +172,6 @@ ADD COLUMN approved BOOLEAN DEFAULT FALSE;
 ALTER TABLE products
 ADD COLUMN is_active BOOLEAN DEFAULT TRUE;
 
-ALTER TABLE categories
-ADD COLUMN is_active BOOLEAN DEFAULT TRUE;
-
 -- Link users and their roles
 ALTER TABLE users ADD COLUMN role_id INT DEFAULT NULL, ADD FOREIGN KEY (role_id) REFERENCES roles(id);
 
@@ -185,7 +183,8 @@ INSERT INTO roles (name) VALUES
 INSERT INTO categories (name) VALUES
   ('Electronics'),
   ('Wearables'),
-  ('Home Appliances');
+  ('Home Appliances'),
+  ('Others');
 
 
 INSERT INTO products (name, model, serial_number, description, category_id, price, stock, warranty_status, distributor_info, image_path, popularity)

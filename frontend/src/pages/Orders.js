@@ -126,6 +126,12 @@ const Orders = () => {
               </Stack>
 
               <Typography>Status: {order.status}</Typography>
+              {order.status === 'in-transit' && (
+                <Typography sx={{ mt: 1 }} color="primary">
+                  Delivery ID: {order.delivery_id}
+                </Typography>
+              )}
+              
               <Typography>Date: {orderDate.toLocaleString()}</Typography>
               <Divider sx={{ my: 2 }} />
 
