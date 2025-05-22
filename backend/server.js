@@ -24,7 +24,7 @@ const invoicesDir = path.join(__dirname, "invoices");
 if (!fs.existsSync(invoicesDir)) fs.mkdirSync(invoicesDir);
 
 app.use("/product_images", express.static("product_images"));
-app.use(cors({ origin: "http://localhost:3000", credentials: true }));
+app.use(cors({ origin: "http://backend:3000", credentials: true }));
 app.use(express.json());
 app.use(backendSession);
 
