@@ -45,12 +45,11 @@ resource "google_container_node_pool" "primary_nodes" {
   location   = google_container_cluster.gke_cluster.location
   node_count = 1
 
-  lifecycle {
-    ignore_changes = [
-      # ignore any drift in node_config (including that auto-injected label)
-      node_config,
-    ]
-  }
+  #lifecycle {
+    #ignore_changes = [
+      #node_config,
+    #]
+  #}
 
   autoscaling {
     min_node_count = 2
@@ -59,7 +58,7 @@ resource "google_container_node_pool" "primary_nodes" {
 
   node_config {
     #machine_type = "e2-small"
-	machine_type = "e2-custom-2-8192"   # 2 vCPUs, 8 GB RAM
+	machine_type = "e2-custom-2-2048"   # 2 vCPUs, 2 GB RAM
     preemptible  = false
 	
 	disk_size_gb = 20
@@ -90,7 +89,7 @@ provider "kubernetes" {
 resource "google_compute_instance" "mysql_vm" {
   name         = "mysql-vm"
   #machine_type = "e2-micro"
-  machine_type = "e2-custom-2-8192"   # 2 vCPUs, 8 GB RAM
+  machine_type = "e2-custom-1-1024"   # 1 vCPUs, 1 GB RAM
   zone         = var.zone
   
   allow_stopping_for_update = true
