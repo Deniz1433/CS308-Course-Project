@@ -981,14 +981,19 @@ app.post("/api/comments", async (req, res) => {
 
 // ----- PROFILE ROUTES -----
 
+// GET /api/user/profile
 app.get("/api/user/profile", async (req, res) => {
   const userId = req.session.user?.id;
-  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
   try {
-    const [rows] = await pool.promise().query(
-      "SELECT id, name, email, home_address FROM users WHERE id = ?",
-      [userId]
-    );
+    const [rows] = await pool
+      .promise()
+      .query(
+        "SELECT id, name, email, home_address, tax_id FROM users WHERE id = ?",
+        [userId]
+      );
     if (!rows.length) {
       return res.status(404).json({ error: "User not found" });
     }
@@ -999,30 +1004,40 @@ app.get("/api/user/profile", async (req, res) => {
   }
 });
 
+// PUT /api/user/profile
 app.put("/api/user/profile", async (req, res) => {
   const userId = req.session.user?.id;
-  if (!userId) return res.status(401).json({ error: "Unauthorized" });
-  const { name, home_address, password } = req.body;
-  if (!name) return res.status(400).json({ error: "Name is required" });
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const { name, home_address, password, tax_id } = req.body;
+  if (!name) {
+    return res.status(400).json({ error: "Name is required" });
+  }
+
   try {
-    const fields = ["name = ?"];
-    const params = [name];
-    fields.push("home_address = ?");
-    params.push(home_address || null);
+    // build dynamic SET clause
+    const fields = ["name = ?", "home_address = ?", "tax_id = ?"];
+    const params = [name, home_address || null, tax_id];
+
     if (password) {
-      const h = bcrypt.hashSync(password, 10);
+      const hashed = bcrypt.hashSync(password, 10);
       fields.push("password = ?");
-      params.push(h);
+      params.push(hashed);
     }
+
     params.push(userId);
-    const sql = `UPDATE users SET ${fields.join(",")} WHERE id = ?`;
+    const sql = `UPDATE users SET ${fields.join(", ")} WHERE id = ?`;
     await pool.promise().query(sql, params);
+
     res.json({ message: "Profile updated successfully" });
   } catch (err) {
     console.error("Update profile error:", err);
     res.status(500).json({ error: "Failed to save profile" });
   }
 });
+
 app.get("/api/invoice/:orderId/pdf", requireSalesManager, (req, res) => {
   const file = path.join(invoicesDir, `invoice_${req.params.orderId}.pdf`);
   res.sendFile(file, err => {

@@ -1,6 +1,5 @@
-// src/pages/Profile.js
 import React, { useState, useEffect, useContext } from 'react';
-import { createTheme, ThemeProvider, styled } from '@mui/material/styles';
+import { styled } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import {
@@ -24,15 +23,24 @@ const MainContainer = styled(Box)(({ theme }) => ({
 export default function ProfilePage() {
   const { user } = useContext(SessionContext);
   const navigate = useNavigate();
-  const [form, setForm] = useState({ name: '', email: '', home_address: '', password: '', confirmPassword: '' });
+
+  const [form, setForm] = useState({
+    id: '',
+    name: '',
+    email: '',
+    home_address: '',
+    tax_id: 0,
+    password: '',
+    confirmPassword: ''
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState('');
-  const BackContainer = styled(Box)(({ theme }) => ({
-  marginBottom: theme.spacing(2),
-}));
 
+  const BackContainer = styled(Box)(({ theme }) => ({
+    marginBottom: theme.spacing(2),
+  }));
 
   useEffect(() => {
     if (!user) {
@@ -46,10 +54,12 @@ export default function ProfilePage() {
       })
       .then(data => {
         setForm({
-          name: data.name || '',
-          email: data.email || '',
+          id:           data.id,
+          name:         data.name || '',
+          email:        data.email || '',
           home_address: data.home_address || '',
-          password: '',
+          tax_id:       data.tax_id || 0,
+          password:     '',
           confirmPassword: ''
         });
         setLoading(false);
@@ -62,13 +72,15 @@ export default function ProfilePage() {
 
   const handleChange = e => {
     const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
+    setForm(prev => ({
+      ...prev,
+      [name]: name === 'tax_id' ? parseInt(value, 10) || 0 : value
+    }));
   };
 
   const handleSave = () => {
     setError(null);
     setSuccess('');
-    // Validate password match
     if (form.password && form.password !== form.confirmPassword) {
       setError('New password and confirmation do not match.');
       return;
@@ -76,8 +88,9 @@ export default function ProfilePage() {
 
     setSaving(true);
     const payload = {
-      name: form.name,
-      home_address: form.home_address
+      name:         form.name,
+      home_address: form.home_address,
+      tax_id:       form.tax_id
     };
     if (form.password) payload.password = form.password;
 
@@ -93,7 +106,11 @@ export default function ProfilePage() {
       .then(() => {
         setSuccess('Profile updated successfully');
         setSaving(false);
-        setForm(prev => ({ ...prev, password: '', confirmPassword: '' }));
+        setForm(prev => ({ 
+          ...prev, 
+          password: '', 
+          confirmPassword: '' 
+        }));
       })
       .catch(err => {
         setError(err.message);
@@ -111,22 +128,28 @@ export default function ProfilePage() {
 
   return (
     <MainContainer>
-		<BackContainer>
-		<Button
-		  startIcon={<ArrowBackIcon />}
-		  onClick={() => navigate('/')}
-		  variant="outlined"
-		>
-		  Back to Products
-		</Button>
-	  </BackContainer>	
+      <BackContainer>
+        <Button
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate('/')}
+          variant="outlined"
+        >
+          Back to Products
+        </Button>
+      </BackContainer>
+
       <Card sx={{ maxWidth: 600, margin: 'auto' }}>
         <CardContent>
           <Typography variant="h4" gutterBottom>
             My Profile
           </Typography>
+          <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+            User ID: {form.id}
+          </Typography>
+
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
           {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
+
           <Box component="form" noValidate autoComplete="off">
             <TextField
               fullWidth
@@ -155,6 +178,15 @@ export default function ProfilePage() {
             <TextField
               fullWidth
               margin="normal"
+              label="Tax ID"
+              name="tax_id"
+              type="number"
+              value={form.tax_id}
+              onChange={handleChange}
+            />
+            <TextField
+              fullWidth
+              margin="normal"
               label="New Password"
               name="password"
               type="password"
@@ -172,6 +204,7 @@ export default function ProfilePage() {
             />
           </Box>
         </CardContent>
+
         <CardActions>
           <Button
             variant="contained"
