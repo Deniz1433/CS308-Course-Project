@@ -52,8 +52,8 @@ resource "google_container_node_pool" "primary_nodes" {
   #}
 
   autoscaling {
-    min_node_count = 2
-    max_node_count = 4
+    min_node_count = 1
+    max_node_count = 2
   }
 
   node_config {
@@ -108,7 +108,7 @@ resource "google_compute_instance" "mysql_vm" {
     access_config {}
   }
 
-  metadata_startup_script = <<-EOT
+  metadata_startup_script = replace(<<-EOT
 #!/bin/bash
 set -e
 
@@ -420,6 +420,7 @@ docker run -d \
   -p 0.0.0.0:3306:3306 \
   mysql:8
 EOT
+, "\r", "")
 }
 
 
