@@ -17,3 +17,8 @@ output "backend_service_ip" {
 output "frontend_service_ip" {
   value = kubernetes_service.frontend.status[0].load_balancer[0].ingress[0].ip
 }
+
+output "newsletter_function_url" {
+  description = "HTTPS trigger URL for sendNewsletter"
+  value       = google_cloudfunctions_function.send_newsletter.https_trigger_url
+}

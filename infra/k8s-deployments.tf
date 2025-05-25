@@ -136,6 +136,11 @@ resource "kubernetes_deployment" "frontend" {
     labels = { app = "frontend" }
   }
 
+  # ensure the Cloud Function exists first
+  depends_on = [
+    google_cloudfunctions_function.send_newsletter
+  ]
+
   spec {
     replicas = 2
 
@@ -155,17 +160,6 @@ resource "kubernetes_deployment" "frontend" {
 
           port { container_port = 80 }
 
-          #resources {
-            #requests = {
-              #cpu    = "250m"
-              #memory = "512Mi"
-            #}
-            #limits = {
-              #cpu    = "1000m"
-              #memory = "1Gi"
-            #}
-          #}
-
           env {
             name  = "CHOKIDAR_USEPOLLING"
             value = "true"
@@ -182,11 +176,16 @@ resource "kubernetes_deployment" "frontend" {
             name  = "PORT"
             value = "3000"
           }
+          env {
+            name  = "REACT_APP_NEWSLETTER_FUNCTION_URL"
+            value = google_cloudfunctions_function.send_newsletter.https_trigger_url
+          }
         }
       }
     }
   }
 }
+
 
 resource "kubernetes_service" "frontend" {
   metadata { name = "frontend-service" }

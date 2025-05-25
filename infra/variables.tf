@@ -82,3 +82,15 @@ variable "dangerously_disable_host_check" {
   description = "Frontend dangerous host check"
   default     = true
 }
+
+variable "gmail_user" {
+  description = "Gmail SMTP user/email"
+  type        = string
+  sensitive   = true
+}
+
+variable "gmail_pass" {
+  description = "Gmail SMTP App Password"
+  type        = string
+  sensitive   = true
+}

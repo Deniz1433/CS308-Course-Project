@@ -45,20 +45,19 @@ resource "google_container_node_pool" "primary_nodes" {
   location   = google_container_cluster.gke_cluster.location
   node_count = 1
 
-  #lifecycle {
-    #ignore_changes = [
-      #node_config,
-    #]
-  #}
+  lifecycle {
+    ignore_changes = [
+      node_config,
+    ]
+  }
 
   autoscaling {
     min_node_count = 1
-    max_node_count = 2
+    max_node_count = 1
   }
 
   node_config {
-    #machine_type = "e2-small"
-	machine_type = "e2-custom-2-2048"   # 2 vCPUs, 2 GB RAM
+	machine_type = "e2-custom-1-1024"   # 1 vCPUs, 1 GB RAM
     preemptible  = false
 	
 	disk_size_gb = 20
@@ -88,7 +87,6 @@ provider "kubernetes" {
 # VM instance for MySQL container
 resource "google_compute_instance" "mysql_vm" {
   name         = "mysql-vm"
-  #machine_type = "e2-micro"
   machine_type = "e2-custom-1-1024"   # 1 vCPUs, 1 GB RAM
   zone         = var.zone
   
@@ -443,3 +441,44 @@ resource "google_compute_firewall" "allow_mysql_internal" {
   target_tags = ["mysql-server"]
 }
 
+# GCS bucket for Cloud Function source
+resource "google_storage_bucket" "function_bucket" {
+  name     = "${var.project_id}-functions"
+  location = var.region
+}
+
+# Upload your zipped function source
+resource "google_storage_bucket_object" "function_source_zip" {
+  name   = "newsletter_function.zip"
+  bucket = google_storage_bucket.function_bucket.name
+  source = "newsletter_function.zip"  # adjust path
+}
+
+# Deploy the HTTP‐triggered Cloud Function
+resource "google_cloudfunctions_function" "send_newsletter" {
+  name        = "sendNewsletter"
+  description = "Sends newsletter via Gmail SMTP"
+  runtime     = "nodejs18"
+  entry_point = "sendNewsletter"
+
+  source_archive_bucket = google_storage_bucket.function_bucket.name
+  source_archive_object = google_storage_bucket_object.function_source_zip.name
+
+  trigger_http        = true
+  available_memory_mb = 128
+
+  environment_variables = {
+    GMAIL_USER = var.gmail_user
+    GMAIL_PASS = var.gmail_pass
+  }
+}
+
+# Grant unauthenticated users permission to invoke the function
+resource "google_cloudfunctions_function_iam_member" "send_newsletter_invoker" {
+  project        = var.project_id
+  region         = var.region
+  cloud_function = google_cloudfunctions_function.send_newsletter.name
+
+  role   = "roles/cloudfunctions.invoker"
+  member = "allUsers"
+}
